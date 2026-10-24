@@ -1,6 +1,6 @@
 # 验收记录
 
-环境：2026-10-25，Node.js 24，Chromium 145（Playwright）。
+环境：2026-10-25，Node.js 24，Chromium 147.0.7727.15（Playwright）。
 
 ## 规则与数据
 
