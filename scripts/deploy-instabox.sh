@@ -9,7 +9,12 @@ command -v docker >/dev/null
 command -v instabox-port >/dev/null
 node scripts/build.mjs
 docker compose -p birth config --quiet
-docker compose -p birth up -d --build --wait --wait-timeout 90
+docker compose -p birth up -d --build --wait --wait-timeout 90 api
+# Bind-mounted configuration files can change inode after git pull. Recreate web
+# so Nginx loads the current file and resolves the API container's current address.
+docker compose -p birth up -d --no-deps --force-recreate --wait --wait-timeout 90 web
 curl --fail --silent --show-error "http://127.0.0.1:$BIRTH_PORT/healthz"
+printf '\n'
+curl --fail --silent --show-error "http://127.0.0.1:$BIRTH_PORT/api/health"
 printf '\n'
 instabox-port publish "$BIRTH_PORT"

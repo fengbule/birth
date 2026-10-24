@@ -3,3 +3,5 @@
 !server.mjs
 !lib/
 !lib/**
+!scripts/
+!scripts/backup.mjs
