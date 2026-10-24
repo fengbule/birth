@@ -1,5 +1,14 @@
 // The demographic inputs are real. The rules below are deliberately a game,
 // not an actuarial, economic, medical, or individual life prediction model.
+import {
+  initSystems,
+  livingCountry,
+  worldCountries,
+  yearSystems,
+  afterChoice,
+  resolveScene,
+  validateSystems,
+} from "./systems.js";
 export const SCHEMA = 1;
 export const clamp = (n, min = 0, max = 100) => Math.min(max, Math.max(min, n));
 export function random(state) {
@@ -158,7 +167,8 @@ export function createLife(countries, options = {}) {
     note: "",
     auto: false,
   };
-  const c = weightedCountry(countries, s.mode, s);
+  const pool = worldCountries(countries, options.world || "today", s.year);
+  const c = weightedCountry(pool, s.mode, s);
   s.country = c.id;
   s.sex = random(s) < 0.488 ? "女" : "男";
   s.name = nameFor(c, s.sex, s);
@@ -177,7 +187,7 @@ export function createLife(countries, options = {}) {
   s.home = random(s) < 0.56 ? "城市" : "乡村";
   s.schoolQuality = clamp(Math.log10(incomeBase(c) / 700) * 29 + 30, 20, 93);
   for (let i = 0; i < 4; i++) {
-    const p = weightedCountry(countries, "births", s),
+    const p = weightedCountry(pool, "births", s),
       sex = random(s) < 0.488 ? "女" : "男";
     s.peers.push({
       country: p.id,
@@ -185,6 +195,7 @@ export function createLife(countries, options = {}) {
       deathAge: estimatedLifetime(p, s),
     });
   }
+  initSystems(s, { ...options, reflections: options.reflections === true });
   addEvent(
     s,
     "第一次与世界相遇",
@@ -602,7 +613,10 @@ function applyEffects(s, e) {
   }
 }
 export function annualIncome(s, c) {
+  const d = initSystems(s);
   if (s.age < 18 || s.education === "大学在读") return 0;
+  if (d.career.unemployed > 0 && !s.retired)
+    return Math.round(incomeBase(c) * 0.035);
   const education =
     s.education === "大学毕业" ? 1.45 : s.education === "职业教育" ? 1.13 : 1;
   return Math.round(
@@ -610,13 +624,15 @@ export function annualIncome(s, c) {
       0.35 *
       education *
       s.salaryFactor *
+      (1 + d.career.level * 0.12) *
       (0.65 + s.knowledge / 150) *
       (s.retired ? 0.35 : 1),
   );
 }
 export function step(s, countries) {
-  if (s.stage !== "living" || s.pending) return s;
-  const c = countries.find((c) => c.id === s.country);
+  const deep = initSystems(s);
+  if (s.stage !== "living" || s.pending || deep.reflection !== null) return s;
+  const c = livingCountry(s, countries);
   if (!c) throw Error("Country missing");
   s.age++;
   const r = () => random(s);
@@ -687,7 +703,10 @@ export function step(s, countries) {
     addEvent(s, e[0], e[1]);
   }
   if (!s.gentle && s.age > 8 && r() < 0.035) {
-    applyEffects(s, { health: -8, money: -s.income * 0.08 });
+    applyEffects(s, {
+      health: deep.insurance ? -4 : -8,
+      money: -s.income * (deep.insurance ? 0.02 : 0.08),
+    });
     addEvent(
       s,
       "需要慢下来的日子",
@@ -696,6 +715,7 @@ export function step(s, countries) {
   }
   const d = decisions.find((d) => d.age === s.age);
   if (d) s.pending = d.age;
+  yearSystems(s, countries);
   if (s.age % 10 === 0 && !d)
     addEvent(
       s,
@@ -705,10 +725,12 @@ export function step(s, countries) {
   return s;
 }
 export function choose(s, index, countries) {
+  if (s.stage !== "living") return false;
+  if (s.pending === "scene") return resolveScene(s, index, countries);
   const d = decisions.find((d) => d.age === s.pending),
     choice = d?.choices[index];
   if (!choice) return false;
-  const c = countries.find((c) => c.id === s.country);
+  const c = livingCountry(s, countries);
   let result = choice.result;
   applyEffects(s, choice.effect);
   Object.assign(s, choice.set || {});
@@ -782,6 +804,7 @@ export function choose(s, index, countries) {
   s.income = annualIncome(s, c);
   addEvent(s, d.title, result, "decision");
   s.pending = null;
+  afterChoice(s, countries);
   return true;
 }
 export function stageName(age) {
@@ -863,13 +886,13 @@ export function validateLife(s, countries) {
     if (typeof s[k] !== "string" || s[k].length > 150) return false;
   if (
     ![5, 15, 30].includes(s.duration) ||
-    ![null, ...decisions.map((d) => d.age)].includes(s.pending) ||
-    (s.pending !== null && s.pending !== s.age)
+    ![null, "scene", ...decisions.map((d) => d.age)].includes(s.pending) ||
+    (s.pending !== null && s.pending !== "scene" && s.pending !== s.age)
   )
     return false;
   if (
     !Array.isArray(s.events) ||
-    s.events.length > 600 ||
+    s.events.length > 2000 ||
     !s.events.every(
       (e) =>
         e &&
@@ -898,5 +921,5 @@ export function validateLife(s, countries) {
     )
   )
     return false;
-  return true;
+  return validateSystems(s, countries);
 }

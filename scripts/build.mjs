@@ -18,6 +18,9 @@ async function walk(dir) {
 await walk("public");
 await writeFile(
   "dist/version.json",
-  JSON.stringify({ version: "1.0.0", sha256: digest.digest("hex") }),
+  JSON.stringify({
+    version: JSON.parse(await readFile("package.json", "utf8")).version,
+    sha256: digest.digest("hex"),
+  }),
 );
 console.log("Static build ready in dist/");

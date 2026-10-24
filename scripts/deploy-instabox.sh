@@ -9,7 +9,7 @@ command -v docker >/dev/null
 command -v instabox-port >/dev/null
 node scripts/build.mjs
 docker compose -p birth config --quiet
-docker compose -p birth up -d --wait --wait-timeout 60
+docker compose -p birth up -d --build --wait --wait-timeout 90
 curl --fail --silent --show-error "http://127.0.0.1:$BIRTH_PORT/healthz"
 printf '\n'
 instabox-port publish "$BIRTH_PORT"

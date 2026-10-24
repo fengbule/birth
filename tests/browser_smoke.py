@@ -34,7 +34,7 @@ with sync_playwright() as p:
     page.locator('[data-action=pause]').click()
     page.screenshot(path=str(out/'game-desktop.png'),full_page=True)
     loops=0
-    while page.locator('#memory-note').count()==0 and loops<40:
+    while page.locator('#memory-note').count()==0 and loops<80:
         if page.locator('#modal').is_visible():
             page.locator('[data-choice="0"]').click()
         else:

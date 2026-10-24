@@ -10,6 +10,19 @@ import {
   validateLife,
   incomeBase,
 } from "./engine.js";
+import {
+  configureEras,
+  initSystems,
+  livingCountry,
+  worldCountries,
+  specialDecision,
+} from "./systems.js";
+import {
+  setupDeepUI,
+  decorateGame,
+  pauseForReflection,
+  openPublicMemory,
+} from "./deep-ui.js";
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -147,11 +160,13 @@ function setSampling(mode) {
       : "从现有人口中随机抽取一个出生地，人生同样从 0 岁开始。";
   renderBars();
 }
-function weights(mode = sampling) {
-  const rows = countries.map((c) => ({
-    ...c,
-    weight: c.population * (mode === "population" ? 1 : c.birthRate / 1000),
-  }));
+function weights(mode = sampling, setting = worldSettings()) {
+  const rows = worldCountries(countries, setting.world, setting.year).map(
+    (c) => ({
+      ...c,
+      weight: c.population * (mode === "population" ? 1 : c.birthRate / 1000),
+    }),
+  );
   const total = rows.reduce((a, c) => a + c.weight, 0);
   return rows
     .map((c) => ({ ...c, probability: c.weight / total }))
@@ -167,8 +182,29 @@ function renderBars() {
         `<div class="country-row"><span class="country-label"><span>${flag(c)}</span>${esc(c.name)}</span><div class="country-track"><div class="country-fill" style="width:${(c.probability / max) * 100}%"></div></div><span class="country-pct">${(c.probability * 100).toFixed(1)}%</span></div>`,
     )
     .join("");
+  const setting = worldSettings();
   $("#data-description").textContent =
-    `${meta.year} 年世界银行数据 · ${countries.length} 个国家和地区`;
+    `${setting.world === "past" ? setting.year : setting.world === "future" ? "2050 情景假设" : meta.year} 年${setting.world === "future" ? "游戏情景" : "世界银行数据"} · ${rows.length} 个国家和地区`;
+}
+function worldSettings() {
+  const value = $("#world-select")?.value || "today";
+  return {
+    world: value.startsWith("past")
+      ? "past"
+      : value === "future"
+        ? "future"
+        : "today",
+    year: value.startsWith("past")
+      ? Number(value.split("-")[1])
+      : value === "future"
+        ? 2050
+        : new Date().getFullYear(),
+  };
+}
+function worldSource(setting = worldSettings()) {
+  return setting.world === "future"
+    ? "2050 年游戏情景假设（非人口预测）"
+    : `${setting.world === "past" ? setting.year : meta.year} 年世界银行 WDI 固定截面`;
 }
 function renderArchives() {
   const lives = history.slice(0, 3);
@@ -195,7 +231,8 @@ function birth(seed) {
     duration,
     origin: $("#origin-select").value,
     gentle: $("#gentle-mode").checked,
-    year: new Date().getFullYear(),
+    ...worldSettings(),
+    reflections: $("#reflection-mode").checked,
   });
   running = false;
   speed = 1;
@@ -205,16 +242,16 @@ function birth(seed) {
 }
 function showRegistration() {
   const s = current,
-    c = country(s.country);
+    c = livingCountry(s, countries);
   modal(
     "BIRTH REGISTRATION / 出生登记",
-    `<div class="birth-registration"><div class="profile-flag">${flag(c)}</div><h2>你好，${esc(s.name)}。</h2><p class="birth-info">${s.year} 年 · ${esc(c.name)} · ${esc(s.sex)}孩</p><div class="registration-grid"><div><span>你降生的地方</span><strong>${esc(c.name)} · ${esc(s.home)}</strong></div><div><span>你最初的家</span><strong>${esc(s.familyLabel)}</strong></div><div><span>当地预期寿命（2023）</span><strong>${c.life.toFixed(1)} 岁</strong></div><div><span>这次抽中该地的概率</span><strong>${(weights(s.mode).find((x) => x.id === c.id).probability * 100).toFixed(2)}%</strong></div></div><p class="birth-quote">你还不知道，<br>怎样的世界正在等你。</p><p class="field-hint">姓名、家庭及人生经历均为虚构。预期寿命是群体统计，与你实际走过的年岁不同。</p><button class="primary-button full-width" data-action="begin-life">开始这一生 <span>→</span></button><button class="text-button" data-action="share" style="margin-top:17px">分享这个起点 ↗</button></div>`,
+    `<div class="birth-registration"><div class="profile-flag">${flag(c)}</div><h2>你好，${esc(s.name)}。</h2><p class="birth-info">${s.year} 年 · ${esc(c.name)} · ${esc(s.sex)}孩</p><div class="registration-grid"><div><span>你降生的地方</span><strong>${esc(c.name)} · ${esc(s.home)}</strong></div><div><span>你最初的家</span><strong>${esc(s.familyLabel)}</strong></div><div><span>当地预期寿命（${s.deep.world === "past" ? s.year : s.deep.world === "future" ? "2050 假设" : meta.year}）</span><strong>${c.life.toFixed(1)} 岁</strong></div><div><span>这次抽中该地的概率</span><strong>${(weights(s.mode, { world: s.deep.world, year: s.year }).find((x) => x.id === c.id).probability * 100).toFixed(2)}%</strong></div></div><p class="birth-quote">你还不知道，<br>怎样的世界正在等你。</p><p class="field-hint">姓名、家庭及人生经历均为虚构。预期寿命是群体统计，与你实际走过的年岁不同。</p><button class="primary-button full-width" data-action="begin-life">开始这一生 <span>→</span></button><button class="text-button" data-action="share" style="margin-top:17px">分享这个起点 ↗</button></div>`,
   );
 }
 function renderGame() {
   if (!current) return;
   const s = current,
-    c = country(s.country),
+    c = livingCountry(s, countries),
     isEnded = s.stage === "ended";
   const stats = [
     ["health", "健康"],
@@ -232,7 +269,7 @@ function renderGame() {
   const origin = country(s.origin);
   $("#game-view").innerHTML =
     `<div class="game-toolbar"><div class="game-toolbar-left"><button data-action="exit">← 暂存并返回</button><span class="small-index">LIFE NO. ${String(s.seed).padStart(10, "0")}</span></div><div class="game-controls"><button data-action="pause" class="${running ? "active" : ""}" ${isEnded ? "disabled" : ""}>${running ? "Ⅱ 暂停" : "▶ 继续"}</button>${[1, 4, 16].map((n) => `<button data-speed="${n}" class="${speed === n ? "active" : ""}" aria-pressed="${speed === n}">${n}×</button>`).join("")}<button data-action="next-year" ${isEnded ? "disabled" : ""}>下一年</button><button data-action="next-choice" ${isEnded ? "disabled" : ""}>下个选择 ↠</button><button data-action="auto" class="${s.auto ? "active" : ""}" aria-pressed="${Boolean(s.auto)}">自动 ${s.auto ? "开" : "关"}</button><button data-action="music" aria-pressed="${musicOn}">${musicOn ? "♫" : "♪"} 音乐</button></div></div>
-  <div class="game-grid"><aside class="profile-card"><div class="profile-identity"><div class="profile-flag">${flag(c)}</div><h1>${esc(s.name)}</h1><p class="profile-country">${esc(c.name)} · ${s.year} 年出生 · ${esc(s.sex)}</p><div class="age-display"><strong>${s.age}</strong><span>岁 / ${s.year + s.age}</span></div><p class="life-stage">${stageName(s.age)}</p></div><div class="profile-stats">${stats.map(([key, label]) => `<div class="stat-row"><span>${label}</span><span>${Math.round(s[key])} / 100</span></div><div class="stat-track ${key}"><i style="width:${s[key]}%"></i></div>`).join("")}<p class="field-hint">每一项状态都会随生活与选择变化。</p></div><div class="profile-meta"><div><span>家庭</span><b>${esc(s.familyLabel)}</b></div><div><span>学习</span><b>${esc(s.education)}</b></div><div><span>现在</span><b>${esc(s.occupation)}</b></div><div><span>积蓄</span><b>${money(s.money)}</b></div><div><span>年收入</span><b>${money(s.income)}</b></div><div><span>身边的人</span><b>${s.partner ? "有伴侣" : "独自生活"}${s.children ? " · " + s.children + " 个孩子" : ""}</b></div><div><span>住处</span><b>${esc(s.housing)}</b></div></div><div class="focus-box"><label for="focus-select">这一年，把心思放在…</label><select id="focus-select" ${isEnded ? "disabled" : ""}>${[
+  <div class="game-grid"><aside class="profile-card"><div class="profile-identity"><div class="profile-flag">${flag(c)}</div><h1>${esc(s.name)}</h1><p class="profile-country">${esc(country(s.country).name)} · ${s.year} 年出生 · ${esc(s.sex)}</p><div class="age-display"><strong>${s.age}</strong><span>岁 / ${s.year + s.age}</span></div><p class="life-stage">${stageName(s.age)}</p></div><div class="profile-stats">${stats.map(([key, label]) => `<div class="stat-row"><span>${label}</span><span>${Math.round(s[key])} / 100</span></div><div class="stat-track ${key}"><i style="width:${s[key]}%"></i></div>`).join("")}<p class="field-hint">每一项状态都会随生活与选择变化。</p></div><div class="profile-meta"><div><span>家庭</span><b>${esc(s.familyLabel)}</b></div><div><span>学习</span><b>${esc(s.education)}</b></div><div><span>现在</span><b>${esc(s.occupation)}</b></div><div><span>积蓄</span><b>${money(s.money)}</b></div><div><span>年收入</span><b>${money(s.income)}</b></div><div><span>身边的人</span><b>${s.partner ? "有伴侣" : "独自生活"}${s.children ? " · " + s.children + " 个孩子" : ""}</b></div><div><span>住处</span><b>${esc(s.housing)}</b></div></div><div class="focus-box"><label for="focus-select">这一年，把心思放在…</label><select id="focus-select" ${isEnded ? "disabled" : ""}>${[
     ["balanced", "平衡生活"],
     ["health", "照顾身体"],
     ["study", "学习新知"],
@@ -256,10 +293,12 @@ function renderGame() {
     })
     .join(
       "",
-    )}</section><section class="insight-card"><h3>一格一年，一格一生</h3><p>每一个被点亮的小格子，都是你走过的日子。</p><div class="life-squares">${Array.from({ length: 110 }, (_, i) => `<i class="${i < s.age ? "lived" : i === s.age ? "current" : ""}" title="${i} 岁"></i>`).join("")}</div><div class="map-legend"><span>0 岁</span><span>109 岁</span></div></section><section class="insight-card"><h3>时间与人生</h3><p>${esc(c.name)}的预期寿命为 ${c.life.toFixed(1)} 岁。图线仅为围绕该均值的游戏示意，非真实生命表。</p><svg class="survival-chart" viewBox="0 0 220 95" role="img" aria-label="以当地预期寿命为中心的寿命分布示意"><path d="M0 85H220" stroke="var(--line)" fill="none"/><polyline points="${curve}" fill="none" stroke="var(--green)" stroke-width="1.5"/><circle cx="${(s.age / 110) * 220}" cy="${85 - survival * 75}" r="3" fill="var(--accent)"/></svg>${origin ? `<p>你的真实出生地：${esc(origin.name)}<br>当地预期寿命 ${origin.life.toFixed(1)} 岁，与此处相差 ${Math.abs(origin.life - c.life).toFixed(1)} 年。</p>` : ""}<button class="text-button" data-action="share" style="margin-top:13px">分享这段人生 ↗</button></section></aside></div><p class="game-bottom-note">${meta.year} 年世界银行 WDI 固定截面 · 寿命、姓名、家庭、收入及经历使用游戏模型，不是个人命运预测。${!c.gdp ? "该地 PPP 数据缺失，收入基数采用收入组的游戏估计值。" : ""} 进度自动保存在此浏览器，可在「我的人生」导出。</p>`;
+    )}</section><section class="insight-card"><h3>一格一年，一格一生</h3><p>每一个被点亮的小格子，都是你走过的日子。</p><div class="life-squares">${Array.from({ length: 110 }, (_, i) => `<i class="${i < s.age ? "lived" : i === s.age ? "current" : ""}" title="${i} 岁"></i>`).join("")}</div><div class="map-legend"><span>0 岁</span><span>109 岁</span></div></section><section class="insight-card"><h3>时间与人生</h3><p>${esc(c.name)}的预期寿命为 ${c.life.toFixed(1)} 岁。图线仅为围绕该均值的游戏示意，非真实生命表。</p><svg class="survival-chart" viewBox="0 0 220 95" role="img" aria-label="以当地预期寿命为中心的寿命分布示意"><path d="M0 85H220" stroke="var(--line)" fill="none"/><polyline points="${curve}" fill="none" stroke="var(--green)" stroke-width="1.5"/><circle cx="${(s.age / 110) * 220}" cy="${85 - survival * 75}" r="3" fill="var(--accent)"/></svg>${origin ? `<p>你的真实出生地：${esc(origin.name)}<br>当地预期寿命 ${origin.life.toFixed(1)} 岁，与此处相差 ${Math.abs(origin.life - c.life).toFixed(1)} 年。</p>` : ""}<button class="text-button" data-action="share" style="margin-top:13px">分享这段人生 ↗</button></section></aside></div><p class="game-bottom-note">${worldSource({ world: s.deep.world, year: s.year })} · 寿命、姓名、家庭、收入及经历使用游戏模型，不是个人命运预测。${!c.gdp ? "该地 PPP 数据缺失，收入基数采用收入组的游戏估计值。" : ""} 进度自动保存在此浏览器，可在「我的人生」导出。</p>`;
+  decorateGame();
 }
 function performStep() {
   if (!current || current.stage !== "living") return;
+  if (pauseForReflection()) return;
   if (current.pending) {
     if (current.auto) autoChoose();
     else showDecision();
@@ -272,14 +311,19 @@ function performStep() {
     running = false;
     archive(current);
     showMemory(current);
-  } else if (current.pending) {
+  } else if (pauseForReflection()) return;
+  else if (current.pending) {
     if (current.auto) autoChoose();
     else showDecision();
   }
 }
 function showDecision() {
   if (!current?.pending) return;
-  const d = decisions.find((d) => d.age === current.pending);
+  const d =
+    current.pending === "scene"
+      ? specialDecision(current)
+      : decisions.find((d) => d.age === current.pending);
+  if (!d) return;
   modal(
     "A TURN IN YOUR LIFE / 人生的路口",
     `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p><div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><b>${esc(c.title)} <span>↗</span></b><small>${esc(c.hint)}</small></button>`).join("")}</div><p class="decision-footnote">没有标准答案。选择会改变状态、关系与经济状况，结果也受环境和运气影响。关闭窗口后，时间会停在这里等你。</p>`,
@@ -300,7 +344,7 @@ function autoChoose() {
 function statistics() {
   modal(
     "THE WORLD IN NUMBERS / 世界数据",
-    `<h2 class="modal-title">起点不同，人生各异。</h2><p class="modal-description">世界银行 WDI ${meta.year} 年数据 · ${countries.length} 个国家和地区。概率按${sampling === "births" ? "人口 × 粗出生率" : "人口"}加权，并在有完整人口、出生率与寿命数据的地区间归一化。</p><input type="search" id="country-search" class="data-search" aria-label="搜索国家或地区" placeholder="搜索国家、地区或英文名…"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>国家和地区</th><th>抽中概率</th><th>预期寿命</th><th>人口</th></tr></thead><tbody id="data-rows"></tbody></table></div><p class="data-links">出生人数估计 = 人口 × 粗出生率 ÷ 1000；四舍五入与统计覆盖范围会影响比例。此表使用冻结的 2023 年截面，不随模拟年份变化。<br>数据源：<a href="https://data.worldbank.org/indicator/SP.POP.TOTL" target="_blank" rel="noopener">人口</a> · <a href="https://data.worldbank.org/indicator/SP.DYN.CBRT.IN" target="_blank" rel="noopener">出生率</a> · <a href="https://data.worldbank.org/indicator/SP.DYN.LE00.IN" target="_blank" rel="noopener">预期寿命</a> · <a href="https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD" target="_blank" rel="noopener">人均 GDP（PPP）</a></p>`,
+    `<h2 class="modal-title">起点不同，人生各异。</h2><p class="modal-description">${worldSource()} · ${weights().length} 个国家和地区。概率按${sampling === "births" ? "人口 × 粗出生率" : "人口"}加权，并在有完整人口、出生率与寿命数据的地区间归一化。</p><input type="search" id="country-search" class="data-search" aria-label="搜索国家或地区" placeholder="搜索国家、地区或英文名…"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>国家和地区</th><th>抽中概率</th><th>预期寿命</th><th>人口</th></tr></thead><tbody id="data-rows"></tbody></table></div><p class="data-links">出生人数估计 = 人口 × 粗出生率 ÷ 1000；四舍五入与统计覆盖范围会影响比例。此表使用开局选择的固定统计环境，不随人生的年岁动态更新；2050 年为游戏假设。<br>数据源：<a href="https://data.worldbank.org/indicator/SP.POP.TOTL" target="_blank" rel="noopener">人口</a> · <a href="https://data.worldbank.org/indicator/SP.DYN.CBRT.IN" target="_blank" rel="noopener">出生率</a> · <a href="https://data.worldbank.org/indicator/SP.DYN.LE00.IN" target="_blank" rel="noopener">预期寿命</a> · <a href="https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD" target="_blank" rel="noopener">人均 GDP（PPP）</a></p>`,
   );
   renderDataRows();
 }
@@ -328,7 +372,7 @@ function showMemory(s) {
     notable = s.events.filter((e) => e.star || e.type === "decision").slice(-5);
   modal(
     "A LIFE, REMEMBERED / 人生的回声",
-    `<div class="memory-card"><div class="memory-symbol">✳</div><h2>${esc(s.name)}</h2><p class="memory-dates">${s.year} — ${ended ? s.year + s.age : "未完"} · ${esc(c.name)} ${flag(c)}</p><p class="memory-summary">${ended ? "从第一次睁开眼睛，到最后一次看见世界。" : "故事停在了这里，但随时可以继续。"}<br>你走过了 ${s.age} 年，${s.partner ? "学会与人相伴，" : ""}${s.children ? "成为一个孩子的依靠，" : ""}也留下了属于自己的痕迹。</p><div class="memory-stats"><div><strong>${s.age}</strong><span>走过的年岁</span></div><div><strong>${s.events.length}</strong><span>被记录的瞬间</span></div><div><strong>${Math.round(s.happiness)}</strong><span>此刻的快乐</span></div></div><textarea id="memory-note" class="memory-note" maxlength="500" placeholder="给这一生，留下一句话…" aria-label="给这一生留下一句话">${esc(s.note)}</textarea><div class="memory-events">${notable.map((e) => `<p><span>${e.age} 岁</span>${esc(e.title)}</p>`).join("")}</div></div><div class="modal-buttons"><button class="small-button" data-action="save-note">保存这句话</button><button class="small-button" data-action="download-card">↓ 保存人生卡片</button></div><div class="modal-buttons">${!ended ? `<button class="primary-button" data-resume-memory="${esc(s.id)}">继续这段人生 →</button>` : ""}<button class="primary-button" data-action="rebirth">再遇见一种人生 ↗</button></div><p class="history-note">${ended ? "这段人生已自动保存在本地档案。" : "这段故事还未结束。"}珍惜每一种生活，也珍惜你自己。</p>`,
+    `<div class="memory-card"><div class="memory-symbol">✳</div><h2>${esc(s.name)}</h2><p class="memory-dates">${s.year} — ${ended ? s.year + s.age : "未完"} · ${esc(c.name)} ${flag(c)}</p><p class="memory-summary">${ended ? "从第一次睁开眼睛，到最后一次看见世界。" : "故事停在了这里，但随时可以继续。"}<br>你走过了 ${s.age} 年，${s.partner ? "学会与人相伴，" : ""}${s.children ? "成为一个孩子的依靠，" : ""}也留下了属于自己的痕迹。</p><div class="memory-stats"><div><strong>${s.age}</strong><span>走过的年岁</span></div><div><strong>${s.events.length}</strong><span>被记录的瞬间</span></div><div><strong>${Math.round(s.happiness)}</strong><span>此刻的快乐</span></div></div><textarea id="memory-note" class="memory-note" maxlength="500" placeholder="给这一生，留下一句话…" aria-label="给这一生留下一句话">${esc(s.note)}</textarea><div class="memory-events">${notable.map((e) => `<p><span>${e.age} 岁</span>${esc(e.title)}</p>`).join("")}</div></div><div class="modal-buttons"><button class="small-button" data-action="save-note">保存这句话</button><button class="small-button" data-action="download-card">↓ 保存人生卡片</button></div><div class="modal-buttons">${!ended ? `<button class="primary-button" data-resume-memory="${esc(s.id)}">继续这段人生 →</button>` : ""}<button class="primary-button" data-action="rebirth">再遇见一种人生 ↗</button></div><div class="modal-buttons">${ended ? '<button class="small-button" data-deep="publish-preview">将摘要留在公共纪念馆 ↗</button>' : ""}</div><p class="history-note">${ended ? "这段人生已自动保存在本地档案。" : "这段故事还未结束。"}珍惜每一种生活，也珍惜你自己。</p>`,
   );
 }
 function saveNote() {
@@ -424,6 +468,9 @@ async function share() {
   url.search = "";
   url.searchParams.set("seed", current.seed);
   url.searchParams.set("mode", current.mode);
+  const d = initSystems(current);
+  url.searchParams.set("world", d.world);
+  url.searchParams.set("year", current.year);
   const text = `在八十亿分之一，我成为了来自${country(current.country).name}的${current.name}。你会遇见怎样的人生？`;
   try {
     if (navigator.share)
@@ -500,7 +547,7 @@ async function downloadCard() {
 function about() {
   modal(
     "ABOUT THIS EXPERIMENT / 关于这个实验",
-    `<h2 class="modal-title">看见别人，也重新看见自己。</h2><div class="about-text"><p>这个独立实现的人生模拟，玩法灵感来自 <a href="https://1in8b.life/en/" target="_blank" rel="noopener">1 in 8 Billion</a>。没有复制原站源代码、美术、文字或玩家内容，也不与原站的纪念馆、账户或付费系统互通。</p><h3>哪些来自统计？</h3><p>出生地使用世界银行 WDI 2023 年人口与粗出生率加权抽取，覆盖 ${countries.length} 个有完整人口、出生率和寿命数据的国家和地区。预期寿命与人均 GDP（PPP）同样来自 WDI。人口合计约 ${(countries.reduce((a, c) => a + c.population, 0) / 1e8).toFixed(1)} 亿，估计年出生人数约 ${(countries.reduce((a, c) => a + (c.population * c.birthRate) / 1000, 0) / 1e8).toFixed(2)} 亿。所有年份沿用这一固定截面。</p><h3>哪些是游戏？</h3><p>姓名、性别抽签、家庭条件、城市或乡村、职业、收入、关系、选择与事件均是虚构规则。寿命以当地均值和简化随机分布生成，不使用真实生命表；不模拟婴儿死亡、战争、暴力或自伤。收入以人均 GDP 为游戏基数，缺失时使用收入组估计，不能视作当地实际工资。温柔模式减少普通疾病事件。页面的告别计数使用约每秒 2 人的演示值。</p><h3>你的故事，留在你这里</h3><p>进度、档案和留言只存于浏览器，没有账户、第三方分析、公共纪念馆或数据上报。分享链接只包含随机种子和抽样方式；下载的卡片保存在你的设备。更换设备前请在「我的人生」导出档案。</p><p>数据：<a href="https://data.worldbank.org" target="_blank" rel="noopener">世界银行 WDI（CC BY 4.0）</a>，地图：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth（公共领域）</a>。<a href="https://github.com/fengbule/birth" target="_blank" rel="noopener">源代码与部署说明 ↗</a></p></div>`,
+    `<h2 class="modal-title">看见别人，也重新看见自己。</h2><div class="about-text"><p>这个独立实现的人生模拟，玩法灵感来自 <a href="https://1in8b.life/en/" target="_blank" rel="noopener">1 in 8 Billion</a>。没有复制原站源代码、美术、文字或玩家内容，也不与原站的纪念馆、账户或付费系统互通。</p><h3>哪些来自统计？</h3><p>出生地使用世界银行 WDI 2023 年人口与粗出生率加权抽取，覆盖 ${countries.length} 个有完整人口、出生率和寿命数据的国家和地区。预期寿命与人均 GDP（PPP）同样来自 WDI。人口合计约 ${(countries.reduce((a, c) => a + c.population, 0) / 1e8).toFixed(1)} 亿，估计年出生人数约 ${(countries.reduce((a, c) => a + (c.population * c.birthRate) / 1000, 0) / 1e8).toFixed(2)} 亿。还可以选择 1970、1990、2010 年历史截面；2050 年为明确标注的游戏假设，不是人口预测。每一局始终沿用开局选定的统计环境。</p><h3>哪些是游戏？</h3><p>姓名、性别抽签、家庭条件、城市或乡村、职业、收入、关系、选择与事件均是虚构规则。寿命以当地均值和简化随机分布生成，不使用真实生命表；不模拟婴儿死亡、战争、暴力或自伤。收入以人均 GDP 为游戏基数，缺失时使用收入组估计，不能视作当地实际工资。温柔模式减少普通疾病事件。页面的告别计数使用约每秒 2 人的演示值。</p><h3>你的故事，留在你这里</h3><p>完整进度、人生停顿和本地档案只存于浏览器。你可以自愿预览并公开一段已结束的虚构人生摘要；公开纪念、烛光与留言保存在本站服务器，可凭本机管理凭证撤回。没有账户和第三方分析。分享起点链接包含随机种子、抽样方式与世界设置；下载的卡片保存在你的设备。更换设备前请在「我的人生」导出档案。</p><p>数据：<a href="https://data.worldbank.org" target="_blank" rel="noopener">世界银行 WDI（CC BY 4.0）</a>，地图：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth（公共领域）</a>。<a href="https://github.com/fengbule/birth" target="_blank" rel="noopener">源代码与部署说明 ↗</a></p></div>`,
   );
 }
 function confirmNew() {
@@ -681,7 +728,10 @@ document.addEventListener("click", async (e) => {
       running = false;
       for (
         let i = 0;
-        i < 111 && current.stage === "living" && !current.pending;
+        i < 111 &&
+        current.stage === "living" &&
+        !current.pending &&
+        initSystems(current).reflection === null;
         i++
       )
         step(current, countries);
@@ -690,7 +740,7 @@ document.addEventListener("click", async (e) => {
       if (current.stage === "ended") {
         archive(current);
         showMemory(current);
-      } else showDecision();
+      } else if (!pauseForReflection()) showDecision();
       break;
     case "auto":
       current.auto = !current.auto;
@@ -741,6 +791,7 @@ document.addEventListener("change", (e) => {
     save();
     toast("接下来的一年，会多留一点心思在这里。");
   }
+  if (e.target.id === "world-select") renderBars();
 });
 document.addEventListener("input", (e) => {
   if (e.target.id === "country-search") renderDataRows(e.target.value);
@@ -782,13 +833,17 @@ setInterval(() => {
     $("#modal").open
   )
     return;
+  if (initSystems(current).reflection !== null) {
+    pauseForReflection();
+    return;
+  }
   if (current.pending) {
     if (current.auto) autoChoose();
     return;
   }
   elapsed += delta;
   const interval =
-    (current.duration * 60000) / country(current.country).life / speed;
+    (current.duration * 60000) / livingCountry(current, countries).life / speed;
   if (elapsed >= interval) {
     elapsed = 0;
     performStep();
@@ -886,12 +941,30 @@ window.addEventListener("resize", () => {
 });
 async function init() {
   try {
-    const r = await fetch("/data/countries.json");
+    const [r, eraResponse] = await Promise.all([
+      fetch("/data/countries.json"),
+      fetch("/data/eras.json"),
+    ]);
     if (!r.ok) throw Error("data");
+    if (!eraResponse.ok) throw Error("historical data");
+    configureEras(await eraResponse.json());
     meta = await r.json();
     countries = meta.countries;
     if (!countries.length) throw Error("data");
     load();
+    if (current) initSystems(current);
+    setupDeepUI({
+      getCurrent: () => current,
+      getCountries: () => countries,
+      getMemory: selectedMemory,
+      modal,
+      save,
+      render: renderGame,
+      close: closeModal,
+      toast,
+      saveNote,
+      showMemory,
+    });
     const opts = [...countries].sort((a, b) =>
       a.name.localeCompare(b.name, "zh-CN"),
     );
@@ -931,6 +1004,16 @@ async function init() {
       });
     const params = new URLSearchParams(location.search),
       seedText = params.get("seed");
+    const sharedWorld = params.get("world"),
+      sharedYear = Number(params.get("year"));
+    if (sharedWorld === "past" && [1970, 1990, 2010].includes(sharedYear))
+      $("#world-select").value = "past-" + sharedYear;
+    else if (sharedWorld === "future") $("#world-select").value = "future";
+    renderBars();
+    if (/^[a-f0-9]{24}$/.test(params.get("memorial") || "")) {
+      await openPublicMemory(params.get("memorial"));
+      return;
+    }
     if (
       seedText &&
       /^\d{1,10}$/.test(seedText) &&

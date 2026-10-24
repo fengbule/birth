@@ -103,6 +103,17 @@
             <div class="section-kicker">准备好，和世界重新相遇</div>
             <h2>你的人生，即将开始。</h2>
             <p class="muted">把未知交给概率，把接下来交给自己。</p>
+            <div class="setting-line">
+              <label for="world-select"
+                >你降生的世界 <span>历史统计、今日，或未来情景</span></label
+              ><select id="world-select">
+                <option value="today">今日的世界</option>
+                <option value="past-1970">1970 · 历史截面</option>
+                <option value="past-1990">1990 · 历史截面</option>
+                <option value="past-2010">2010 · 历史截面</option>
+                <option value="future">2050 · 未来情景假设</option>
+              </select>
+            </div>
             <fieldset>
               <legend>如何抽取你的出生地 <span>01</span></legend>
               <div class="segmented" id="sampling-options">
@@ -146,6 +157,11 @@
               <label for="gentle-mode"
                 >温柔模式 <span>减少疾病类随机事件</span></label
               ><input type="checkbox" id="gentle-mode" checked role="switch" />
+            </div>
+            <div class="setting-line">
+              <label for="reflection-mode"
+                >人生停顿 <span>在五个年龄，停下来想一个问题</span></label
+              ><input type="checkbox" id="reflection-mode" role="switch" />
             </div>
             <button
               id="birth-button"
@@ -216,6 +232,19 @@
             </button>
           </div>
           <div id="recent-lives" class="recent-lives"></div>
+        </section>
+        <section class="community-section wrap">
+          <div class="archive-title">
+            <div>
+              <span class="small-index">04 / THE LIVES WE SHARE</span>
+              <h2>有些人生，可以被一起记得。</h2>
+              <p class="field-hint" id="community-count">正在打开公共纪念馆…</p>
+            </div>
+            <button class="text-button" data-deep="memorials">
+              走进纪念馆 ↗
+            </button>
+          </div>
+          <div id="community-lives" class="recent-lives"></div>
         </section>
       </div>
       <div id="game-view" class="wrap hidden"></div>

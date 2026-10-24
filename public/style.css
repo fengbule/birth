@@ -1902,3 +1902,276 @@ dialog::backdrop {
 .event {
   animation: none;
 }
+.game-system-bar {
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+.system-tabs {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.system-tabs button {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: var(--surface);
+  font-size: 11px;
+}
+.system-tabs button:first-child {
+  background: var(--green-soft);
+}
+.game-system-bar > p {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.game-system-bar > p span {
+  margin-inline: 9px;
+}
+.game-system-bar b {
+  color: var(--ink);
+  font-weight: 400;
+}
+.balance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 23px 0;
+  border-block: 1px solid var(--line);
+  margin-top: 22px;
+}
+.balance-grid span {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.balance-grid strong {
+  font: 25px var(--serif);
+  overflow-wrap: anywhere;
+}
+.balance-grid .small-value {
+  font-size: 18px;
+}
+.panel-subtitle {
+  font: 18px var(--serif);
+  font-weight: 400;
+  margin: 25px 0 14px;
+}
+.people-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 23px;
+}
+.person-card {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 17px;
+  background: var(--bg);
+}
+.person-card > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.person-card h3 {
+  font: 17px var(--serif);
+  margin: 7px 0;
+}
+.person-card p {
+  font-size: 10px;
+  color: var(--muted);
+}
+.person-gone {
+  opacity: 0.65;
+}
+.activity-list {
+  display: grid;
+  gap: 9px;
+}
+.activity-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 13px 15px;
+  border-radius: 4px;
+  gap: 12px;
+}
+.activity-button b {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+}
+.activity-button small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.8;
+}
+.activity-button em {
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+  color: var(--green);
+}
+.activity-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.asset-lines {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.asset-lines p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  font-size: 11px;
+  margin: 9px 0;
+}
+.asset-lines span {
+  color: var(--muted);
+}
+.asset-lines b {
+  font-weight: 400;
+}
+.trade-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 8px;
+}
+.trade-form input,
+.trade-form select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  padding: 9px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+.milestone-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+.milestone-tags span {
+  border: 1px solid var(--line);
+  background: var(--green-soft);
+  padding: 5px 8px;
+  font-size: 9px;
+  border-radius: 3px;
+}
+.journal-list {
+  margin-top: 22px;
+}
+.journal-list article {
+  border-top: 1px solid var(--line);
+  padding: 15px 0;
+}
+.journal-list span {
+  display: block;
+  font: 10px monospace;
+  color: var(--muted);
+  margin-block: 5px;
+}
+.journal-list p {
+  font-size: 12px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.journey-list p {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.community-section {
+  border-top: 1px solid var(--line);
+  padding-block: 42px 55px;
+}
+.community-section .life-card p {
+  overflow-wrap: anywhere;
+}
+.public-preview {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  padding: 20px;
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 2;
+}
+.public-note {
+  margin-top: 22px;
+  font-family: var(--serif);
+  font-size: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.danger-button {
+  color: var(--accent);
+  margin-top: 22px;
+}
+.progress-card > .text-button {
+  margin-top: 10px;
+}
+@media (max-width: 760px) {
+  .system-tabs {
+    gap: 7px;
+  }
+  .system-tabs button {
+    font-size: 10px;
+    padding: 10px;
+  }
+  .game-system-bar > p {
+    font-size: 9px;
+    line-height: 1.9;
+  }
+  .people-grid {
+    gap: 8px;
+  }
+  .person-card {
+    padding: 13px;
+  }
+  .balance-grid strong {
+    font-size: 22px;
+  }
+  .activity-button {
+    padding: 13px 11px;
+  }
+  .activity-button small {
+    font-size: 10px;
+  }
+  .trade-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .trade-form button {
+    grid-column: 1/-1;
+    padding: 10px;
+  }
+  .community-section {
+    padding-block: 30px;
+  }
+  .community-section h2 {
+    font-size: 20px;
+  }
+  .community-section .archive-title {
+    gap: 8px;
+  }
+  .community-section .archive-title > .text-button {
+    white-space: nowrap;
+  }
+  .history-actions select {
+    max-width: 100%;
+  }
+}
