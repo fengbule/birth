@@ -2,6 +2,8 @@
 
 如果人生，再来一次。一个可以自行部署的中文人生模拟游戏，灵感来自 [1 in 8 Billion](https://1in8b.life/en/)，以独立代码实现。
 
+**在线体验：[打开八十亿分之一](https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech)**
+
 按全球出生人数或现有人口抽取出生地，在另一个家庭开始，从童年走到暮年。以公开统计作为起点，用选择续写虚构的人生。
 
 ## 已实现
@@ -62,5 +64,15 @@ npm run build
 更新脚本只写公开统计与地图。改变覆盖地区会影响种子到身份的映射，发布前应检查数据差异、同步署名文档。固定数据与规则下，分享种子可复现相同起点，后续选择由各自决定。
 
 Node 测试覆盖抽样分布、确定性出生、选择暂停、教育与住房经济影响、导入校验、全部选项，以及 1,000 段完整人生的状态与结束条件。浏览器验收记录见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
+
+可选浏览器验收（另开终端运行 `npm run dev`）：
+
+```sh
+python -m pip install playwright
+python -m playwright install chromium
+python tests/browser_smoke.py
+```
+
+通过 `BIRTH_TEST_URL` 测试已部署站点，`CHROMIUM_PATH` 指定已有 Chromium，`BIRTH_TEST_OUTPUT` 指定输出目录（默认 `test-results/`，已忽略）。测试使用独立浏览器上下文，产生的虚构人生不会写入服务器。
 
 代码采用 MIT 许可；外部数据分别适用其原始许可。服务器令牌、SSH 密钥、玩家存档与部署凭据不属于代码仓库。

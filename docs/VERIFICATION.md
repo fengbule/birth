@@ -18,7 +18,11 @@
 
 ## 部署
 
-独立 Docker Compose 项目 `birth`，Nginx 静态托管，宿主机回环端口 8086，Instabox HTTPS 公网入口。上线后检查 `/healthz`、静态资源、内容摘要和 HTTPS 浏览器主流程。现有服务的容器 ID、运行状态、重启计数在部署前后对比。
+独立 Docker Compose 项目 `birth`，Nginx 静态托管，宿主机回环端口 8086，Instabox HTTPS 公网入口。上线后已检查 `/healthz`、静态资源、内容摘要和 HTTPS 浏览器完整人生主流程。部署前后的既有四个服务容器 ID 一致，均保持 healthy。
+
+地址：[在线体验](https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech)。服务器目录：`/data/workspace/birth`。
+
+首次部署的静态资源 SHA-256：`238b69c5e3f4e879780561c9256221b654e40e3f49aa11d1224fbdc59d216be5`，本地构建与服务器一致。公网与本地均完成桌面、手机、导出、恢复与完整人生测试。可用 `tests/browser_smoke.py` 重跑浏览器验收。
 
 ## 已知范围
 
