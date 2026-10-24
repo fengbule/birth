@@ -9,6 +9,8 @@ with sync_playwright() as p:
     b=p.chromium.launch(headless=True,executable_path=os.environ.get('CHROMIUM_PATH'))
     ctx=b.new_context(viewport={'width':1440,'height':1000})
     page=ctx.new_page();errors=[]
+    # Stable birth fixture; engine sampling randomness is covered separately.
+    page.add_init_script("crypto.getRandomValues = array => { array.fill(9); return array; };")
     page.on('pageerror',lambda e:errors.append(str(e)))
     page.on('console',lambda m:errors.append(m.text) if m.type=='error' else None)
     page.goto(BASE,wait_until='networkidle')
@@ -74,11 +76,15 @@ with sync_playwright() as p:
     page.locator('#memory-note').fill('自动验收临时人生，完成后撤回。')
     page.locator('[data-deep=publish-preview]').click()
     assert page.locator('.public-preview').is_visible()
-    page.locator('[data-deep=publish]').click()
-    page.locator('[data-deep=candle]').wait_for()
-    tokens=page.evaluate("JSON.parse(localStorage.getItem('birth.memorialOwners'))")
-    public_id=list(tokens)[-1]
+    with page.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/api/memorials')) as publication:
+        page.locator('[data-deep=publish]').click()
+    response=publication.value
+    assert response.status==201, response.text()
+    created=response.json()
+    public_id=created['id'];tokens={public_id:created['ownerToken']}
     try:
+        page.locator('[data-deep=candle]').wait_for()
+        assert page.evaluate("JSON.parse(localStorage.getItem('birth.memorialOwners'))")[public_id]==tokens[public_id]
         page.screenshot(path=str(OUT/'public-memorial.png'))
         visitor=b.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
         other=visitor.new_page();other.on('pageerror',lambda e:errors.append(str(e)))

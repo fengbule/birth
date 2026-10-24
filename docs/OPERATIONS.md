@@ -23,7 +23,7 @@ cd /data/workspace/birth
 mkdir -p /data/workspace/birth-backups
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 docker compose -p birth exec -T api node /app/scripts/backup.mjs "/tmp/birth-$stamp.sqlite"
-docker compose -p birth cp "api:/tmp/birth-$stamp.sqlite" "/data/workspace/birth-backups/birth-$stamp.sqlite"
+docker compose -p birth exec -T api cat "/tmp/birth-$stamp.sqlite" > "/data/workspace/birth-backups/birth-$stamp.sqlite"
 docker compose -p birth exec -T api rm "/tmp/birth-$stamp.sqlite"
 ```
 
@@ -51,4 +51,3 @@ curl -fsS http://127.0.0.1:8086/api/health
 没有账户。发布返回随机撤回凭证，数据库仅存其哈希；访问者标识 Cookie 为 HttpOnly、SameSite，按 UTC 每天每段纪念限一盏烛光。写接口校验来源、大小、字段和频率，文本经转义显示。应用不保存访客 IP 到数据库，内存中按 IP 哈希限流；平台或 Nginx 可能有普通访问日志。
 
 如果出现不合适的公开内容，管理员可在备份后，通过 SQLite 按已核实的纪念 ID 删除该记录，关联烛光和留言由外键级联删除。当前没有账户审核或举报队列。
-
