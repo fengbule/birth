@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f5ed" />
+    <title>八十亿分之一 · 如果人生，再来一次</title>
+    <meta
+      name="description"
+      content="一次无法选择起点的人生实验。按真实人口与出生率抽取出生地，在另一个地方，经历另一种人生。"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到内容</a>
+    <header class="site-header wrap">
+      <a class="brand" href="/" aria-label="八十亿分之一 首页"
+        ><img src="/favicon.svg" width="32" height="32" alt="" /><span
+          >八十亿分之一<small>A LIFE, AMONG BILLIONS</small></span
+        ></a
+      >
+      <nav aria-label="主导航">
+        <button data-action="home" class="nav-active">人生实验</button
+        ><button data-action="statistics">世界数据 <span>↗</span></button
+        ><button data-action="history">
+          我的人生 <span id="history-count">0</span>
+        </button>
+      </nav>
+      <button
+        class="icon-button theme-toggle"
+        data-action="theme"
+        aria-label="切换深色模式"
+        title="切换明暗"
+      >
+        ◐
+      </button>
+    </header>
+    <main id="main">
+      <div id="home-view">
+        <section class="hero wrap">
+          <div class="hero-copy">
+            <div class="eyebrow">
+              <span class="live-dot"></span> 一个关于偶然、选择与人生的实验
+            </div>
+            <h1>
+              如果人生，<br />再来<span class="serif-italic">一次。</span>
+            </h1>
+            <p class="hero-description">
+              世界每一秒，都有人第一次睁开眼睛。<br />这一次，你会出生在哪里，又会成为怎样的人？
+            </p>
+            <a class="primary-button hero-cta" href="#begin"
+              >开启另一种人生 <span>↗</span></a
+            >
+            <span class="hero-note"
+              >你无法选择起点，但可以写下自己的故事。</span
+            >
+            <div class="world-clock">
+              <div><strong id="born-counter">0</strong><span>人降生</span></div>
+              <div>
+                <strong id="death-counter">0</strong><span>人告别</span>
+              </div>
+              <p>
+                从你来到这里的那一刻起<br />世界仍在继续
+                <span class="tiny-dot"></span>
+              </p>
+            </div>
+          </div>
+          <div class="world-visual">
+            <div class="world-heading">
+              <span>THE WORLD, RIGHT NOW</span
+              ><span>每一个光点，都是一种可能</span>
+            </div>
+            <div class="map-container">
+              <canvas
+                id="world-map"
+                aria-label="世界出生地分布示意图"
+                role="img"
+              ></canvas
+              ><span class="map-coordinate">23° N &nbsp; 86° E</span>
+              <div class="map-caption">
+                <span class="live-dot"></span> SOMEWHERE, A LIFE BEGINS.
+              </div>
+            </div>
+            <div class="map-bottom">
+              <div><strong>1</strong><span>个你</span></div>
+              <span class="map-divider"></span>
+              <div><strong>8,000,000,000</strong><span>种可能</span></div>
+            </div>
+            <p class="map-footnote">
+              没有人选择自己的出生。每一种人生，都值得被看见。
+            </p>
+          </div>
+        </section>
+        <section class="intro-strip wrap">
+          <span class="small-index">01 / THE BEGINNING</span>
+          <p>换一个起点，<em>看见另一个世界。</em></p>
+          <span class="strip-note">真实统计作为起点 · 由你的选择续写</span>
+        </section>
+        <section class="setup-section wrap" id="begin">
+          <div class="setup-card">
+            <div class="section-kicker">准备好，和世界重新相遇</div>
+            <h2>你的人生，即将开始。</h2>
+            <p class="muted">把未知交给概率，把接下来交给自己。</p>
+            <fieldset>
+              <legend>如何抽取你的出生地 <span>01</span></legend>
+              <div class="segmented" id="sampling-options">
+                <button
+                  class="selected"
+                  data-sampling="births"
+                  aria-pressed="true"
+                >
+                  按全球出生人数</button
+                ><button data-sampling="population" aria-pressed="false">
+                  按全球现有人口
+                </button>
+              </div>
+              <p class="field-hint" id="sampling-hint">
+                成为此刻降生的一个婴儿。出生率越高的地方，越有可能遇见你。
+              </p>
+            </fieldset>
+            <fieldset>
+              <legend>用多久，走过这一生 <span>02</span></legend>
+              <div class="duration-options">
+                <button class="selected" data-duration="5" aria-pressed="true">
+                  <strong>5</strong> 分钟<small>短暂而完整</small></button
+                ><button data-duration="15" aria-pressed="false">
+                  <strong>15</strong> 分钟<small>慢慢地生活</small></button
+                ><button data-duration="30" aria-pressed="false">
+                  <strong>30</strong> 分钟<small>细细地感受</small>
+                </button>
+              </div>
+              <p class="field-hint">
+                以预期寿命估算，不含选择时的停顿。随时可以暂停、加速或跳到下个选择。
+              </p>
+            </fieldset>
+            <div class="setting-line">
+              <label for="origin-select"
+                >你真实的出生地 <span>可选，用于对照</span></label
+              ><select id="origin-select">
+                <option value="">让一切保持未知</option>
+              </select>
+            </div>
+            <div class="setting-line">
+              <label for="gentle-mode"
+                >温柔模式 <span>减少疾病类随机事件</span></label
+              ><input type="checkbox" id="gentle-mode" checked role="switch" />
+            </div>
+            <button
+              id="birth-button"
+              data-action="birth"
+              class="primary-button full-width"
+              disabled
+            >
+              正在连接世界… <span>↗</span>
+            </button>
+            <button
+              id="resume-button"
+              class="resume-button hidden"
+              data-action="resume"
+            >
+              继续上一次的人生 →
+            </button>
+            <p class="privacy-note">
+              无需登录 · 人生保存在此浏览器 · 随时可以重新开始
+            </p>
+          </div>
+          <aside class="probability-card">
+            <div class="section-kicker">如果你此刻降生</div>
+            <h2>世界会怎样<br />掷出这枚骰子？</h2>
+            <p class="muted" id="data-description">正在读取公开数据…</p>
+            <div id="country-bars" class="country-bars"></div>
+            <button data-action="statistics" class="text-button">
+              看看整个世界的数据 <span>↗</span>
+            </button>
+            <div class="data-source-note">
+              <span>↳</span>
+              <p>
+                出生地由公开统计加权抽取。<br />每一个百分比背后，都是具体的人生。
+              </p>
+            </div>
+          </aside>
+        </section>
+        <section class="experience-section wrap">
+          <div>
+            <span class="small-index">02 / A LIFE UNFOLDS</span>
+            <h2>一生很长，<br />也可以很近。</h2>
+          </div>
+          <article>
+            <span class="feature-number">01</span>
+            <h3>一个全新的身份</h3>
+            <p>
+              出生地、家庭境况与最初的机会，由概率决定。你会遇见另一种日常。
+            </p>
+          </article>
+          <article>
+            <span class="feature-number">02</span>
+            <h3>由你做出选择</h3>
+            <p>求学、工作、相爱、变老。选择改变人生，环境也始终留下痕迹。</p>
+          </article>
+          <article>
+            <span class="feature-number">03</span>
+            <h3>留下人生的回声</h3>
+            <p>看看与你同时出生的人。为这一生留下一句话，再回望自己。</p>
+          </article>
+        </section>
+        <section class="archive-preview wrap">
+          <div class="archive-title">
+            <div>
+              <span class="small-index">03 / THE LIVES WE KEEP</span>
+              <h2>每一种平凡，都有回响。</h2>
+            </div>
+            <button data-action="history" class="text-button">
+              我的人生档案 ↗
+            </button>
+          </div>
+          <div id="recent-lives" class="recent-lives"></div>
+        </section>
+      </div>
+      <div id="game-view" class="wrap hidden"></div>
+    </main>
+    <footer class="site-footer wrap">
+      <div class="footer-top">
+        <a class="brand" href="/"
+          >八十亿分之一<span class="footer-en">BIRTH</span></a
+        >
+        <p>世界很大。你的一生，独一无二。</p>
+        <div>
+          <button data-action="about">关于这个实验</button
+          ><a
+            href="https://github.com/fengbule/birth"
+            target="_blank"
+            rel="noopener"
+            >GitHub ↗</a
+          >
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>
+          玩法灵感来自
+          <a href="https://1in8b.life/en/" target="_blank" rel="noopener"
+            >1 in 8 Billion</a
+          >
+          · 独立实现 · 非官方版本
+        </p>
+        <p>世界银行 WDI 2023 · 人生事件为虚构模拟</p>
+      </div>
+    </footer>
+    <dialog id="modal">
+      <div class="modal-heading">
+        <span id="modal-kicker" class="section-kicker"></span
+        ><button
+          class="icon-button"
+          data-action="close"
+          aria-label="关闭对话框"
+        >
+          ×
+        </button>
+      </div>
+      <div id="modal-content"></div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="load-error" class="load-error hidden" role="alert">
+      世界数据暂时未能加载，请刷新重试。<button data-action="reload">
+        重新连接
+      </button>
+    </div>
+  </body>
+</html>
