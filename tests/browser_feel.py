@@ -36,7 +36,9 @@ with sync_playwright() as p:
         began=time.monotonic();next_stop(page);fast_ms=round((time.monotonic()-began)*1000)
         assert page.locator('.choice-tag').inner_text().startswith('2 岁')
         assert page.locator('[data-choice]').count()==4
+        page.screenshot(path=str(OUT/f'choice-2-{width}.png'))
         page.locator('[data-action=choice-auto]').click()
+        page.screenshot(path=str(OUT/f'auto-preview-{width}.png'))
         assert page.locator('.auto-preview').count()==1
         assert page.locator('[data-action=auto]').get_attribute('aria-pressed')=='true'
         page.locator('#modal-content h2').click()
@@ -69,6 +71,7 @@ with sync_playwright() as p:
         next_stop(page)
         assert page.locator('.choice-tag').inner_text().startswith('7 岁')
         assert page.locator('[data-choice]').count()==3
+        page.screenshot(path=str(OUT/f'choice-7-{width}.png'))
         page.locator('[data-choice="0"]').click()
         assert page.locator('.focus-choices button').count()==5
         assert page.locator('.event').filter(has_text='慢慢长成自己的样子').count()==1

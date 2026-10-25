@@ -454,6 +454,7 @@ function showDecision(automatic = false) {
     "重大抉择",
     `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p>${d.age===2?'<aside class="choice-context-note">人格差异与遗传和环境都有关。2015 年一项综合研究的平均遗传率估计约为 40%。<a href="https://pubmed.ncbi.nlm.nih.gov/25961374/" target="_blank" rel="noopener">Vukasović 与 Bratko</a></aside>':''}<div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><span class="choice-number">${i+1}</span><span><b>${esc(c.title)}</b><small>${esc(c.hint)}</small></span></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。收起窗口后，时间会停在这里等你。</p>`,
   );
+  $('#modal').dataset.choiceAge=String(current.age);
   if (automatic) {
     suppressedDecision = null;
     const pick = autoChoiceIndex(current,d,()=>random(current));

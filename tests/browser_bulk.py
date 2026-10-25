@@ -74,7 +74,7 @@ async def run_life(browser,sem,index,fixture):
                     selected=1 if s['age']==18 else (index+len(result['decisions']))%count
                     if index%4==3 and len(result['decisions'])<2:
                         await page.locator('[data-action=choice-auto]').click()
-                        await page.wait_for_function("!document.querySelector('#modal').open",timeout=6000)
+                        await page.wait_for_function("() => !document.querySelector('#modal').open",timeout=6000)
                         if await page.locator('[data-action=pause]').get_attribute('aria-pressed')=='false':
                             await page.locator('[data-action=pause]').click()
                         # Explicitly reclaim manual play after observing the reading preview.
@@ -108,9 +108,9 @@ async def run_life(browser,sem,index,fixture):
             ending_start=time.monotonic()
             await page.screenshot(path=str(OUT/f'{fixture["country"]}-ending-start.png'))
             if index==0:
-                await page.wait_for_function("!document.querySelector('.ending-final').classList.contains('hidden')",timeout=65000)
+                await page.wait_for_function("() => !document.querySelector('.ending-final').classList.contains('hidden')",timeout=65000)
                 result['endingFinalDomMs']=round((time.monotonic()-ending_start)*1000)
-                await page.wait_for_function("getComputedStyle(document.querySelector('.ending-final [data-action=ending-record]')).opacity > .99",timeout=10000)
+                await page.wait_for_function("() => getComputedStyle(document.querySelector('.ending-final [data-action=ending-record]')).opacity > .99",timeout=10000)
                 result['endingReadableMs']=round((time.monotonic()-ending_start)*1000)
                 await page.screenshot(path=str(OUT/'adult-ending-settled.png'))
                 await page.locator('[data-action=ending-record]').click()

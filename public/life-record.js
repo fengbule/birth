@@ -37,7 +37,7 @@ export function endingFrames(s,countries) {
 }
 
 export function endingMarkup(s,countries) {
-  return `<button class="ending-skip" data-action="ending-skip">略过</button><div id="ending-stage" aria-live="polite"></div><div class="ending-final hidden"><p class="ending-eyebrow">一生，只走过一次</p><h1>${esc(s.name)}</h1><p class="ending-dates">${s.year} – ${s.year+s.age}</p><p>在${esc(countries.find(c=>c.id===s.country).name)}出生，走过了 ${s.age} 年。</p><h2>八十亿人之中，这一生曾经来过。</h2><button class="primary-button" data-action="ending-record">查看纪录</button></div>`;
+  return `<button class="ending-skip" data-action="ending-skip">略过</button><div id="ending-stage" aria-live="polite"></div><div class="ending-final hidden"><h1>${esc(s.name)}</h1><p class="ending-dates">${s.year} – ${s.year+s.age}</p><p>${esc(countries.find(c=>c.id===s.country).name)}，是这一生的起点。</p><p>走过了 ${s.age} 年，约 ${Math.round(s.age*365.25).toLocaleString("zh-CN")} 个日夜。</p><h2>八十亿人之中，这一生曾经来过。</h2><button class="primary-button" data-action="ending-record">查看纪录</button></div>`;
 }
 
 export function endingFrameMarkup(frame,s,countries) {
