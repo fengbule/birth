@@ -30,7 +30,8 @@ def capture(page, side, stage, width):
     data = {'overflow': page.evaluate('document.documentElement.scrollWidth>innerWidth'),
             'heading': visible_style(page, 'h1'),
             'pauseButton': visible_style(page, '#pauseBtn' if side=='reference' else '[data-action=pause]'),
-            'scene': visible_style(page, '#scene' if side=='reference' else '.life-scene'),
+            # The identity portrait contains another clipped SVG with the same class.
+            'scene': visible_style(page, '#scene' if side=='reference' else '.scene-card > .life-scene'),
             'gridCells': page.locator('#grid > *' if side=='reference' else '.life-squares > *').count(),
             'focusButtonsVisible': page.locator('#focusChips button:visible' if side=='reference' else '.focus-choices button:visible').count(),
             'focusSelectVisible': page.locator('#focus-select:visible').count(),
