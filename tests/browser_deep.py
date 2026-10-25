@@ -1,4 +1,5 @@
 """End-to-end gameplay and memorial persistence smoke test; cleans its public fixture."""
+from browser_helpers import click_action, click_tool, finish_ending
 from playwright.sync_api import sync_playwright, expect
 from pathlib import Path
 import os,json
@@ -51,10 +52,10 @@ with sync_playwright() as p:
     assert state['deep']['assets']['stocks']==10
     page.screenshot(path=str(OUT/'finance-panel.png'))
     page.locator('[data-action=close]').click()
-    page.locator('[data-deep=career]').click()
+    click_tool(page, 'career')
     assert page.locator('.balance-grid').is_visible()
     page.locator('[data-action=close]').click()
-    page.locator('[data-deep=migration]').click()
+    click_tool(page, 'migration')
     options=page.locator('#migration-target option').evaluate_all('(xs)=>xs.map(x=>x.value)')
     target='BDI' if 'BDI' in options else 'MWI'
     page.locator('#migration-target').select_option(target)
@@ -68,6 +69,7 @@ with sync_playwright() as p:
     assert page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).current.deep.assets.stocks")==10
     page.locator('[data-action=pause]').click()
     for _ in range(100):
+        if page.locator('#ending-view').is_visible():finish_ending(page)
         if page.locator('#memory-note').count():break
         if page.locator('[data-choice]').first.is_visible():page.locator('[data-choice="1"]').click()
         elif page.locator('#reflection-text').is_visible():page.locator('[data-deep=skip-reflection]').click()
@@ -102,7 +104,7 @@ with sync_playwright() as p:
         other.screenshot(path=str(OUT/'public-memorial-mobile.png'),full_page=True)
         assert other.locator('[data-deep=confirm-delete-memorial]').count()==0
         page.locator('[data-action=close]').click()
-        page.locator('[data-action=history]').first.click()
+        click_action(page, 'history')
         with page.expect_download() as archive:
             page.locator('[data-action=export]').click()
         private_archive=OUT/'private-transfer-test.json'
@@ -112,7 +114,7 @@ with sync_playwright() as p:
         moved=b.new_context(viewport={'width':390,'height':844})
         restored=moved.new_page();restored.on('pageerror',lambda e:errors.append(str(e)))
         restored.goto(BASE,wait_until='networkidle')
-        restored.locator('[data-action=history]').first.click()
+        click_action(restored, 'history')
         with restored.expect_file_chooser() as chooser:
             restored.locator('[data-action=import]').click()
         chooser.value.set_files(str(private_archive))
@@ -124,7 +126,7 @@ with sync_playwright() as p:
         assert page.request.get(BASE+'/api/memorials/'+public_id).status==404
         private_archive.unlink()
         page.locator('[data-action=close]').click()
-        page.locator('[data-action=exit]').click()
+        click_action(page, 'exit')
         page.set_viewport_size({'width':390,'height':844})
         page.locator('#resume-button').count()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')

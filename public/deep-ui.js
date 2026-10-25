@@ -48,25 +48,6 @@ export function setupDeepUI(config) {
   });
   refreshCommunity();
 }
-export function decorateGame() {
-  const s = app.getCurrent();
-  if (!s) return;
-  const d = initSystems(s),
-    c = livingCountry(s, app.getCountries());
-  const bar = document.createElement("div");
-  bar.className = "game-system-bar";
-  bar.innerHTML = `<div class="system-tabs"><button data-deep="family">家庭与关系</button><button data-deep="finance">消费与投资</button><button data-deep="career">工作与成长</button><button data-deep="migration">迁居世界</button><button data-deep="journal">人生停顿</button><button data-deep="guide">玩法指南 ↗</button></div><p>现居 <b>${esc(c.name)}</b> <span>·</span> 净资产 <b>${money(netWorth(s))}</b> <span>·</span> ${d.world === "past" ? s.year + " 年历史截面" : d.world === "future" ? "2050 未来情景" : "2023 年统计截面"}</p>`;
-  $("#game-view .game-toolbar").after(bar);
-  const panel = document.createElement("section");
-  panel.className = "insight-card progress-card";
-  panel.innerHTML = `<h3>一路走来的回声</h3><p>${d.milestones.length} 个人生里程碑 · ${d.moves.length} 次迁居 · ${d.journal.filter((j) => j.text).length} 句人生停顿</p><div class="milestone-tags">${
-    d.milestones
-      .slice(-5)
-      .map((m) => `<span title="${m.age} 岁">${esc(m.title)}</span>`)
-      .join("") || "<span>你的故事才刚刚开始</span>"
-  }</div><button class="text-button" data-deep="guide">试试更多生活方式 ↗</button>`;
-  $("#game-view .game-insights").append(panel);
-}
 export function pauseForReflection() {
   const s = app.getCurrent();
   if (!s || initSystems(s).reflection === null) return false;

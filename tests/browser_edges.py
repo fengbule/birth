@@ -1,4 +1,5 @@
 """Browser boundary checks, using isolated contexts and no public writes."""
+from browser_helpers import click_action, click_tool, finish_ending
 from playwright.sync_api import sync_playwright, expect
 from pathlib import Path
 import copy, json, os
@@ -34,7 +35,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(1300)
     assert page.locator('.age-display strong').inner_text() == paused_age
     saved = page.evaluate("JSON.parse(localStorage.getItem('birth.v1'))")
-    page.locator('[data-action=history]').first.click()
+    click_action(page, 'history')
     invalid = copy.deepcopy(saved)
     del invalid['current']['deep']['assets']['stocks']
     import_archive(page, invalid)
@@ -74,13 +75,21 @@ with sync_playwright() as p:
     expect(quota.locator('#toast')).to_contain_text('浏览器无法保存进度')
     quota.locator('[data-action=begin-life]').click()
     quota.locator('[data-action=pause]').click()
-    quota.locator('[data-action=history]').first.click()
+    click_action(quota, 'history')
     with quota.expect_download() as download:
         quota.locator('[data-action=export]').click()
     destination = OUT / 'quota-recovery-test.json'
     download.value.save_as(str(destination))
     recovered = json.loads(destination.read_text('utf-8'))
     assert recovered['current']['stage'] == 'living'
+    for malformed in [None, [], 'bad']:
+        broken = browser.new_page()
+        broken.on('pageerror', lambda e: errors.append(str(e)))
+        broken.add_init_script('localStorage.setItem("birth.preferences", '+json.dumps(json.dumps(malformed))+');')
+        broken.goto(BASE, wait_until='networkidle')
+        broken.locator('[data-duration="30"]').click()
+        assert broken.locator('[data-duration="30"]').get_attribute('aria-pressed') == 'true'
+        broken.close()
     assert not errors, errors
     print(json.dumps({'browserErrors': errors, 'speedControls': 6,
                       'invalidImportPreservedProgress': True,

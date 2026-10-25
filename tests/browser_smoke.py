@@ -1,3 +1,4 @@
+from browser_helpers import click_action, click_tool, finish_ending
 from playwright.sync_api import sync_playwright
 from pathlib import Path
 import json,os
@@ -17,6 +18,7 @@ with sync_playwright() as p:
     page.locator('#country-search').fill('中国')
     assert page.locator('#data-rows tr').count()>=1
     page.locator('[data-action=close]').click()
+    page.locator('#reflection-mode').uncheck()
     page.locator('#birth-button').click()
     page.screenshot(path=str(out/'birth-desktop.png'))
     page.locator('[data-action=begin-life]').click()
@@ -35,7 +37,9 @@ with sync_playwright() as p:
     page.screenshot(path=str(out/'game-desktop.png'),full_page=True)
     loops=0
     while page.locator('#memory-note').count()==0 and loops<80:
-        if page.locator('#modal').is_visible():
+        if page.locator('#ending-view').is_visible():
+            finish_ending(page)
+        elif page.locator('#modal').is_visible():
             page.locator('[data-choice="0"]').click()
         else:
             page.locator('[data-action=next-choice]').click()
@@ -48,17 +52,17 @@ with sync_playwright() as p:
         page.locator('[data-action=download-card]').click()
     download.value.save_as(str(out/'life-card.png'))
     page.locator('[data-action=close]').click()
-    page.locator('[data-action=history]').first.click()
+    click_action(page, 'history')
     with page.expect_download() as download:
         page.locator('[data-action=export]').click()
     download.value.save_as(str(out/'test-export.json'))
     saved=json.loads((out/'test-export.json').read_text('utf-8'))
     assert saved['history'][0]['note']=='换一个起点，仍然认真生活。'
     page.locator('[data-action=close]').click()
-    page.locator('[data-action=exit]').click()
-    page.locator('[data-action=theme]').click()
+    click_action(page, 'exit')
+    click_action(page, 'theme')
     page.screenshot(path=str(out/'home-dark.png'),full_page=True)
-    page.locator('[data-action=theme]').click()
+    click_action(page, 'theme')
     mobile=b.new_page(viewport={'width':390,'height':844},device_scale_factor=1,is_mobile=True,has_touch=True)
     mobile.on('pageerror',lambda e:errors.append(str(e)))
     mobile.goto(os.environ.get('BIRTH_TEST_URL','http://127.0.0.1:4173'),wait_until='networkidle')
@@ -98,11 +102,12 @@ with sync_playwright() as p:
     assert int(page.locator('.age-display strong').inner_text())>=8
     page.locator('[data-action=pause]').click()
     assert not page.locator('#modal').is_visible()
-    page.locator('[data-action=music]').click()
-    assert page.locator('[data-action=music]').get_attribute('aria-pressed')=='true'
-    page.locator('[data-action=music]').click()
-    assert page.locator('[data-action=music]').get_attribute('aria-pressed')=='false'
-    page.locator('[data-action=exit]').click()
+    click_action(page, 'music')
+    assert page.locator('[data-action=music]:visible').get_attribute('aria-pressed')=='true'
+    click_action(page, 'music')
+    assert page.locator('[data-action=music]:visible').get_attribute('aria-pressed')=='false'
+    click_action(page, 'exit')
+    page.locator('#reflection-mode').uncheck()
     page.locator('#birth-button').click()
     page.locator('[data-action=confirm-birth]').click()
     page.locator('[data-action=begin-life]').click()
@@ -111,17 +116,17 @@ with sync_playwright() as p:
     page.keyboard.press('Escape')
     assert page.locator('.pending-banner').is_visible()
     age=page.locator('.age-display strong').inner_text()
-    page.locator('[data-action=next-year]').click()
+    click_action(page, 'next-year')
     assert page.locator('.choice-tag').inner_text().startswith(age+' 岁')
     page.locator('[data-choice="2"]').click()
-    page.locator('[data-action=history]').first.click()
+    click_action(page, 'history')
     assert page.locator('.history-grid .life-card').count()==1
     page.locator('.history-grid .life-card').click()
     page.locator('[data-resume-memory]').click()
     current=page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).current")
     assert current['seed']==7788
-    page.locator('[data-action=exit]').click()
-    page.locator('[data-action=history]').first.click()
+    click_action(page, 'exit')
+    click_action(page, 'history')
     with page.expect_file_chooser() as fc:
         page.locator('[data-action=import]').click()
     fc.value.set_files(str(out/'test-export.json'))

@@ -3,283 +3,285 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f5f5ed" />
-    <title>八十亿分之一 · 如果人生，再来一次</title>
+    <meta name="theme-color" content="#ebf0ed" />
+    <title>80亿分之1 · BIRTH 人生模拟</title>
     <meta
       name="description"
-      content="一次无法选择起点的人生实验。按真实人口与出生率抽取出生地，在另一个地方，经历另一种人生。"
+      content="从另一个起点，走过一段人生。公开统计加权出生、人生选择、家庭、职业与纪念。"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/reference.css" />
     <script type="module" src="/app.js"></script>
   </head>
-  <body>
+  <body data-view="home">
     <a class="skip-link" href="#main">跳到内容</a>
-    <header class="site-header wrap">
-      <a class="brand" href="/" aria-label="八十亿分之一 首页"
-        ><img src="/favicon.svg" width="32" height="32" alt="" /><span
-          >八十亿分之一<small>A LIFE, AMONG BILLIONS</small></span
-        ></a
-      >
+    <header class="home-navigation">
+      <a href="/" class="language-current">◎ &nbsp; 简体中文</a>
       <nav aria-label="主导航">
-        <button data-action="home" class="nav-active">人生实验</button
-        ><button data-action="statistics">世界数据 <span>↗</span></button
+        <button data-action="statistics">世界统计</button
         ><button data-action="history">
-          我的人生 <span id="history-count">0</span>
-        </button>
+          前世记录 <span id="history-count">0</span></button
+        ><button data-deep="memorials">追思馆</button
+        ><button data-action="history">移转纪录</button
+        ><button data-action="about">关于模拟</button
+        ><a
+          href="https://github.com/fengbule/birth"
+          target="_blank"
+          rel="noopener"
+          >源代码 ↗</a
+        >
       </nav>
       <button
-        class="icon-button theme-toggle"
+        class="theme-toggle"
         data-action="theme"
         aria-label="切换深色模式"
-        title="切换明暗"
       >
         ◐
       </button>
     </header>
     <main id="main">
-      <div id="home-view">
-        <section class="hero wrap">
-          <div class="hero-copy">
-            <div class="eyebrow">
-              <span class="live-dot"></span> 一个关于偶然、选择与人生的实验
-            </div>
-            <h1>
-              如果人生，<br />再来<span class="serif-italic">一次。</span>
-            </h1>
-            <p class="hero-description">
-              世界每一秒，都有人第一次睁开眼睛。<br />这一次，你会出生在哪里，又会成为怎样的人？
+      <div id="home-view" class="reference-home">
+        <section class="home-hero page-width">
+          <div class="home-intro">
+            <p class="edition-line">
+              BIRTH 3.0 · 免费人生模拟 · 217 个国家和地区 · 独立实现
             </p>
-            <a class="primary-button hero-cta" href="#begin"
-              >开启另一种人生 <span>↗</span></a
-            >
-            <span class="hero-note"
-              >你无法选择起点，但可以写下自己的故事。</span
-            >
-            <div class="world-clock">
-              <div><strong id="born-counter">0</strong><span>人降生</span></div>
+            <h1 class="home-wordmark">80亿<br />分之<span>1</span></h1>
+            <p class="home-description">
+              每一秒，世界上都有新的生命开始。这一次，试着成为其中一人。从无法选择的出生地出发，把属于他的这一生走完。
+            </p>
+            <div class="world-counters">
               <div>
-                <strong id="death-counter">0</strong><span>人告别</span>
+                <strong id="born-counter">0</strong
+                ><span>来到这里以后，世界上降生的人</span>
               </div>
-              <p>
-                从你来到这里的那一刻起<br />世界仍在继续
-                <span class="tiny-dot"></span>
-              </p>
-            </div>
-          </div>
-          <div class="world-visual">
-            <div class="world-heading">
-              <span>THE WORLD, RIGHT NOW</span
-              ><span>每一个光点，都是一种可能</span>
-            </div>
-            <div class="map-container">
-              <canvas
-                id="world-map"
-                aria-label="世界出生地分布示意图"
-                role="img"
-              ></canvas
-              ><span class="map-coordinate">23° N &nbsp; 86° E</span>
-              <div class="map-caption">
-                <span class="live-dot"></span> SOMEWHERE, A LIFE BEGINS.
+              <div>
+                <strong id="death-counter">0</strong
+                ><span>同一段时间，告别世界的人</span>
               </div>
             </div>
-            <div class="map-bottom">
-              <div><strong>1</strong><span>个你</span></div>
-              <span class="map-divider"></span>
-              <div><strong>8,000,000,000</strong><span>种可能</span></div>
-            </div>
-            <p class="map-footnote">
-              没有人选择自己的出生。每一种人生，都值得被看见。
+            <p class="daily-theme">
+              <b>人生主题</b>
+              <strong>相遇</strong>
+              换一个出生地，看见另一种日常。每一种日常，都有值得记住的时刻。
             </p>
           </div>
-        </section>
-        <section class="intro-strip wrap">
-          <span class="small-index">01 / THE BEGINNING</span>
-          <p>换一个起点，<em>看见另一个世界。</em></p>
-          <span class="strip-note">真实统计作为起点 · 由你的选择续写</span>
-        </section>
-        <section class="setup-section wrap" id="begin">
-          <div class="setup-card">
-            <div class="section-kicker">准备好，和世界重新相遇</div>
-            <h2>你的人生，即将开始。</h2>
-            <p class="muted">把未知交给概率，把接下来交给自己。</p>
-            <div class="setting-line">
-              <label for="world-select"
-                >你降生的世界 <span>历史统计、今日，或未来情景</span></label
-              ><select id="world-select">
-                <option value="today">今日的世界</option>
-                <option value="past-1970">1970 · 历史截面</option>
-                <option value="past-1990">1990 · 历史截面</option>
-                <option value="past-2010">2010 · 历史截面</option>
-                <option value="future">2050 · 未来情景假设</option>
-              </select>
+          <div class="home-world">
+            <div class="home-map">
+              <canvas id="world-map" aria-label="世界地图" role="img"></canvas>
+              <p class="map-footnote"></p>
             </div>
+            <aside class="home-probability">
+              <h2>如果你是此刻出生的婴儿</h2>
+              <p id="data-description" class="home-data-caption">
+                正在读取公开统计…
+              </p>
+              <div id="country-bars" class="country-bars"></div>
+              <button data-action="statistics" class="small-button">
+                查看所有国家与地区的统计
+              </button>
+            </aside>
+          </div>
+        </section>
+        <section class="shared-strip page-width">
+          <h2>大家留下的人生</h2>
+          <p>
+            走过的岁月，也可以成为别人的一次相遇。浏览自愿公开的人生，或为一段故事点亮烛光。
+          </p>
+          <button class="small-button" data-deep="memorials">查看全部</button>
+        </section>
+        <section id="begin" class="home-settings page-width">
+          <div class="settings-fields">
             <fieldset>
-              <legend>如何抽取你的出生地 <span>01</span></legend>
-              <div class="segmented" id="sampling-options">
+              <legend>出生的世界</legend>
+              <div class="reference-segments world-buttons">
+                <button data-world="past" aria-pressed="false">
+                  过去的世界</button
+                ><button
+                  class="selected"
+                  data-world="today"
+                  aria-pressed="true"
+                >
+                  现在的世界</button
+                ><button data-world="future" aria-pressed="false">
+                  未来的世界</button
+                ><button data-world="any" aria-pressed="false">
+                  哪个世界都好
+                </button>
+              </div>
+              <label class="era-picker"
+                >出生年份
+                <select id="world-select" aria-label="出生年份">
+                  <option value="today">现在的世界</option>
+                  <option value="past-1970">1970 年</option>
+                  <option value="past-1990">1990 年</option>
+                  <option value="past-2010">2010 年</option>
+                  <option value="future">2050 年 · 情景假设</option>
+                  <option value="any">随机世界</option>
+                </select></label
+              >
+              <p class="setting-hint" id="world-hint">
+                以当前统计作为起点，在这个环境里走过一生。
+              </p>
+            </fieldset>
+            <fieldset>
+              <legend>出生地的抽选方式</legend>
+              <div class="reference-segments" id="sampling-options">
                 <button
                   class="selected"
                   data-sampling="births"
                   aria-pressed="true"
                 >
-                  按全球出生人数</button
+                  此刻出生的婴儿</button
                 ><button data-sampling="population" aria-pressed="false">
-                  按全球现有人口
+                  现在活着的人口
                 </button>
               </div>
-              <p class="field-hint" id="sampling-hint">
-                成为此刻降生的一个婴儿。出生率越高的地方，越有可能遇见你。
+              <p id="sampling-hint" class="setting-hint">
+                按各地每年的出生人数抽取，人生从 0 岁开始。
               </p>
             </fieldset>
             <fieldset>
-              <legend>用多久，走过这一生 <span>02</span></legend>
-              <div class="duration-options">
-                <button data-duration="30" aria-pressed="false">
-                  <strong>30</strong> 分钟<small>短暂而完整</small></button
+              <legend>一段人生的长度</legend>
+              <div class="reference-segments">
+                <button data-duration="30" aria-pressed="false">约30分钟</button
                 ><button
                   class="selected"
                   data-duration="60"
                   aria-pressed="true"
                 >
-                  <strong>60</strong> 分钟<small>慢慢地生活</small></button
+                  约1小时</button
                 ><button data-duration="90" aria-pressed="false">
-                  <strong>90</strong> 分钟<small>细细地感受</small>
+                  约1小时30分钟
                 </button>
               </div>
-              <p class="field-hint">
-                以预期寿命估算，不含选择时的停顿。随时可以暂停、加速或跳到下个选择。
+              <p class="setting-hint">
+                按当地预期寿命估算，不含抉择时的等待。可以随时暂停或加速。
               </p>
             </fieldset>
-            <div class="setting-line">
-              <label for="origin-select"
-                >你真实的出生地 <span>可选，用于对照</span></label
-              ><select id="origin-select">
-                <option value="">让一切保持未知</option>
-              </select>
+            <label class="origin-label" for="origin-select"
+              >你实际出生的国家或地区 <span>（选填）</span></label
+            ><select id="origin-select">
+              <option value="">不选择</option>
+            </select>
+            <p class="setting-hint">
+              用来比较两个地方的统计起点，只保存在这个浏览器里。
+            </p>
+            <div class="home-switches">
+              <label
+                ><input type="checkbox" id="gentle-mode" checked />
+                略过沉重情节</label
+              ><label
+                ><input type="checkbox" id="reflection-mode" checked />
+                人生停顿</label
+              ><button data-action="music">♪ 轻柔的音乐</button>
             </div>
-            <div class="setting-line">
-              <label for="gentle-mode"
-                >温柔模式 <span>减少疾病类随机事件</span></label
-              ><input type="checkbox" id="gentle-mode" checked role="switch" />
-            </div>
-            <div class="setting-line">
-              <label for="reflection-mode"
-                >人生停顿 <span>在五个年龄，停下来想一个问题</span></label
-              ><input type="checkbox" id="reflection-mode" role="switch" />
-            </div>
+          </div>
+          <div class="birth-start-panel">
             <button
               id="birth-button"
+              class="primary-button"
               data-action="birth"
-              class="primary-button full-width"
               disabled
             >
-              正在连接世界… <span>↗</span>
+              正在连接世界…
             </button>
+            <p>不用调整设定，也可以直接开始。</p>
             <button
               id="resume-button"
-              class="resume-button hidden"
+              class="small-button hidden"
               data-action="resume"
             >
-              继续上一次的人生 →
+              继续上一次的人生
             </button>
-            <p class="privacy-note">
-              无需登录 · 人生保存在此浏览器 · 随时可以重新开始
-            </p>
+            <p class="setting-hint">进度保存在本机，离开后可继续。</p>
           </div>
-          <aside class="probability-card">
-            <div class="section-kicker">如果你此刻降生</div>
-            <h2>世界会怎样<br />掷出这枚骰子？</h2>
-            <p class="muted" id="data-description">正在读取公开数据…</p>
-            <div id="country-bars" class="country-bars"></div>
-            <button data-action="statistics" class="text-button">
-              看看整个世界的数据 <span>↗</span>
-            </button>
-            <div class="data-source-note">
-              <span>↳</span>
-              <p>
-                出生地由公开统计加权抽取。<br />每一个百分比背后，都是具体的人生。
-              </p>
-            </div>
-          </aside>
         </section>
-        <section class="experience-section wrap">
-          <div>
-            <span class="small-index">02 / A LIFE UNFOLDS</span>
-            <h2>一生很长，<br />也可以很近。</h2>
-          </div>
-          <article>
-            <span class="feature-number">01</span>
-            <h3>一个全新的身份</h3>
-            <p>
-              出生地、家庭境况与最初的机会，由概率决定。你会遇见另一种日常。
-            </p>
-          </article>
-          <article>
-            <span class="feature-number">02</span>
-            <h3>由你做出选择</h3>
-            <p>求学、工作、相爱、变老。选择改变人生，环境也始终留下痕迹。</p>
-          </article>
-          <article>
-            <span class="feature-number">03</span>
-            <h3>留下人生的回声</h3>
-            <p>看看与你同时出生的人。为这一生留下一句话，再回望自己。</p>
-          </article>
-        </section>
-        <section class="archive-preview wrap">
-          <div class="archive-title">
-            <div>
-              <span class="small-index">03 / THE LIVES WE KEEP</span>
-              <h2>每一种平凡，都有回响。</h2>
-            </div>
-            <button data-action="history" class="text-button">
-              我的人生档案 ↗
-            </button>
-          </div>
-          <div id="recent-lives" class="recent-lives"></div>
-        </section>
-        <section class="community-section wrap">
-          <div class="archive-title">
-            <div>
-              <span class="small-index">04 / THE LIVES WE SHARE</span>
-              <h2>有些人生，可以被一起记得。</h2>
-              <p class="field-hint" id="community-count">正在打开公共纪念馆…</p>
-            </div>
-            <button class="text-button" data-deep="memorials">
-              走进纪念馆 ↗
-            </button>
-          </div>
+        <section class="community-section page-width">
+          <h2>追思馆</h2>
+          <p>把走完的人生轻轻留下，让来访的人读一读、点一支烛光。</p>
+          <p id="community-count" class="setting-hint">正在打开追思馆…</p>
           <div id="community-lives" class="recent-lives"></div>
+          <div class="home-button-row">
+            <button class="small-button" data-deep="memorials">
+              参观追思馆</button
+            ><button class="small-button" data-deep="random-memorial">
+              随机遇见一段人生</button
+            ><button class="small-button" data-action="history">
+              我的人生记录
+            </button>
+          </div>
+        </section>
+        <section class="archive-preview page-width">
+          <h2>前世记录</h2>
+          <p>
+            这些故事保存在你的浏览器里。可以重新打开，也可以导出到另一个装置。
+          </p>
+          <div id="recent-lives" class="recent-lives"></div>
+          <button class="small-button" data-action="history">
+            查看与移转纪录
+          </button>
+        </section>
+        <section class="home-explainer page-width">
+          <h2>在另一个起点生活</h2>
+          <div>
+            <article>
+              <h3>在同一秒出生</h3>
+              <p>四位同行者与你一起长大。从不同的地方出发，走向各自的生活。</p>
+            </article>
+            <article>
+              <h3>暂停片刻</h3>
+              <p>
+                5、15、30、50、70
+                岁，留一点时间思考。回答只写给自己，也可以略过。
+              </p>
+            </article>
+            <article>
+              <h3>统计与选择</h3>
+              <p>
+                人口、出生率和预期寿命来自公开数据。家庭、职业、经济和事件采用独立的游戏规则。
+              </p>
+            </article>
+          </div>
+          <p class="setting-hint">
+            当前提供 1970、1990、2010 年历史截面，以及 2050
+            年游戏情景。不是个人命运预测。
+          </p>
         </section>
       </div>
-      <div id="game-view" class="wrap hidden"></div>
+      <div id="registration-view" class="hidden"></div>
+      <div id="game-view" class="hidden"></div>
+      <section id="ending-view" class="hidden" aria-label="人生落幕"></section>
     </main>
-    <footer class="site-footer wrap">
-      <div class="footer-top">
-        <a class="brand" href="/"
-          >八十亿分之一<span class="footer-en">BIRTH</span></a
+    <footer class="reference-footer page-width">
+      <div class="home-button-row">
+        <button data-action="about">关于这个模拟</button
+        ><button data-action="history">移转纪录</button
+        ><a
+          href="https://github.com/fengbule/birth/blob/main/docs/PARITY-AUDIT.md"
+          target="_blank"
+          rel="noopener"
+          >复现范围</a
+        ><a
+          href="https://github.com/fengbule/birth"
+          target="_blank"
+          rel="noopener"
+          >GitHub ↗</a
         >
-        <p>世界很大。你的一生，独一无二。</p>
-        <div>
-          <button data-action="about">关于这个实验</button
-          ><a
-            href="https://github.com/fengbule/birth"
-            target="_blank"
-            rel="noopener"
-            >GitHub ↗</a
-          >
-        </div>
       </div>
-      <div class="footer-bottom">
-        <p>
-          玩法灵感来自
-          <a href="https://1in8b.life/en/" target="_blank" rel="noopener"
-            >1 in 8 Billion</a
-          >
-          · 独立实现 · 非官方版本
-        </p>
-        <p>世界银行 WDI 2023 · 人生事件为虚构模拟</p>
-      </div>
+      <p>
+        玩法参考
+        <a href="https://1in8b.life/zh-hans/" target="_blank" rel="noopener"
+          >1in8b.life</a
+        >
+        · BIRTH 独立实现，非原站官方版本
+      </p>
+      <p>世界银行 WDI · Natural Earth · 代码 MIT</p>
     </footer>
+    <div class="sticky-birth">
+      <button class="primary-button" data-action="birth">出生</button>
+    </div>
     <dialog id="modal">
       <div class="modal-heading">
         <span id="modal-kicker" class="section-kicker"></span

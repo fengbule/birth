@@ -1,14 +1,11 @@
 import {
   SCHEMA,
-  clamp,
   random,
   createLife,
   step,
   choose,
   decisions,
-  stageName,
   validateLife,
-  incomeBase,
 } from "./engine.js";
 import {
   configureEras,
@@ -16,14 +13,20 @@ import {
   livingCountry,
   worldCountries,
   specialDecision,
+  remember,
 } from "./systems.js";
 import {
   setupDeepUI,
-  decorateGame,
   pauseForReflection,
   openPublicMemory,
 } from "./deep-ui.js";
 import { readOwners, validOwners, mergeOwners } from "./ownership.js";
+import {
+  gameMarkup,
+  miniMap,
+  registrationMarkup,
+  endingMarkup,
+} from "./presentation.js";
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -58,7 +61,9 @@ let countries = [],
   timelineLimit = 20,
   storageOK = true,
   preferences = {},
-  memoryId = null;
+  memoryId = null,
+  endingLife = null,
+  endingOrigin = "game";
 let lastTick = performance.now(),
   elapsed = 0,
   toastTimer,
@@ -66,7 +71,11 @@ let lastTick = performance.now(),
   musicNodes = [],
   musicOn = false;
 try {
-  preferences = JSON.parse(localStorage.getItem(PREF) || "{}");
+  const stored = JSON.parse(localStorage.getItem(PREF) || "{}");
+  preferences =
+    stored && typeof stored === "object" && !Array.isArray(stored)
+      ? stored
+      : {};
   if (preferences.theme === "dark") document.body.classList.add("dark");
 } catch {}
 function country(id) {
@@ -100,6 +109,37 @@ function prefs() {
     localStorage.setItem(PREF, JSON.stringify(preferences));
   } catch {}
 }
+function saveSetup() {
+  preferences.setup = {
+    sampling,
+    duration,
+    world: $("#world-select").value,
+    origin: $("#origin-select").value,
+    gentle: $("#gentle-mode").checked,
+    reflections: $("#reflection-mode").checked,
+  };
+  prefs();
+}
+function restoreSetup() {
+  const setup = preferences?.setup;
+  if (!setup || typeof setup !== "object") return;
+  if ([30, 60, 90].includes(setup.duration)) duration = setup.duration;
+  if (["births", "population"].includes(setup.sampling))
+    sampling = setup.sampling;
+  if ([...$("#world-select").options].some((x) => x.value === setup.world))
+    $("#world-select").value = setup.world;
+  if (countries.some((c) => c.id === setup.origin))
+    $("#origin-select").value = setup.origin;
+  if (typeof setup.gentle === "boolean")
+    $("#gentle-mode").checked = setup.gentle;
+  if (typeof setup.reflections === "boolean")
+    $("#reflection-mode").checked = setup.reflections;
+  document.querySelectorAll("[data-duration]").forEach((b) => {
+    b.classList.toggle("selected", Number(b.dataset.duration) === duration);
+    b.setAttribute("aria-pressed", Number(b.dataset.duration) === duration);
+  });
+  setSampling(sampling);
+}
 function load() {
   try {
     const data = JSON.parse(localStorage.getItem(KEY) || "{}");
@@ -131,6 +171,9 @@ function closeModal() {
 function showHome() {
   running = false;
   view = "home";
+  document.body.dataset.view = view;
+  $("#registration-view").classList.add("hidden");
+  $("#ending-view").classList.add("hidden");
   $("#home-view").classList.remove("hidden");
   $("#game-view").classList.add("hidden");
   $("#resume-button").classList.toggle(
@@ -142,6 +185,9 @@ function showHome() {
 }
 function showGame() {
   view = "game";
+  document.body.dataset.view = view;
+  $("#registration-view").classList.add("hidden");
+  $("#ending-view").classList.add("hidden");
   $("#home-view").classList.add("hidden");
   $("#game-view").classList.remove("hidden");
   lastTick = performance.now();
@@ -173,22 +219,40 @@ function weights(mode = sampling, setting = worldSettings()) {
     .map((c) => ({ ...c, probability: c.weight / total }))
     .sort((a, b) => b.probability - a.probability);
 }
+function syncWorldControls() {
+  const value = $("#world-select").value;
+  const group = value.startsWith("past") ? "past" : value;
+  document.querySelectorAll("[data-world]").forEach((b) => {
+    b.classList.toggle("selected", b.dataset.world === group);
+    b.setAttribute("aria-pressed", b.dataset.world === group);
+  });
+  $("#world-hint").textContent =
+    group === "past"
+      ? "采用所选年份的固定统计截面，不重建历史国界。"
+      : group === "future"
+        ? "2050 年独立游戏情景，非官方预测。"
+        : group === "any"
+          ? "出生时，在三个历史截面、今日与未来情景之间随机选择。"
+          : "以当前统计作为起点，在这个环境里走过一生。";
+}
 function renderBars() {
   const rows = weights(),
     max = rows[0].probability;
-  $("#country-bars").innerHTML = rows
-    .slice(0, 7)
-    .map(
-      (c) =>
-        `<div class="country-row"><span class="country-label"><span>${flag(c)}</span>${esc(c.name)}</span><div class="country-track"><div class="country-fill" style="width:${(c.probability / max) * 100}%"></div></div><span class="country-pct">${(c.probability * 100).toFixed(1)}%</span></div>`,
-    )
-    .join("");
+  $("#country-bars").innerHTML =
+    rows
+      .slice(0, 9)
+      .map(
+        (c) =>
+          `<div class="country-row"><span class="country-label">${esc(c.name)}</span><div class="country-track"><div class="country-fill" style="width:${(c.probability / max) * 100}%"></div></div><span class="country-pct">${(c.probability * 100).toFixed(1)}%</span></div>`,
+      )
+      .join("") +
+    `<div class="country-row other-countries"><span class="country-label">其余 ${rows.length - 9} 个地区</span><div class="country-track"><div class="country-fill" style="width:${rows.slice(9).reduce((sum, c) => sum + c.probability, 0) * 100}%"></div></div><span class="country-pct">${(rows.slice(9).reduce((sum, c) => sum + c.probability, 0) * 100).toFixed(1)}%</span></div>`;
   const setting = worldSettings();
   $("#data-description").textContent =
-    `${setting.world === "past" ? setting.year : setting.world === "future" ? "2050 情景假设" : meta.year} 年${setting.world === "future" ? "游戏情景" : "世界银行数据"} · ${rows.length} 个国家和地区`;
+    `${setting.world === "past" ? setting.year : setting.world === "future" ? "2050 情景假设" : meta.year} 年${setting.world === "future" ? "游戏情景" : "世界银行 WDI"} · ${rows.length} 个国家和地区`;
+  syncWorldControls();
 }
-function worldSettings() {
-  const value = $("#world-select")?.value || "today";
+function worldSettings(value = $("#world-select")?.value || "today") {
   return {
     world: value.startsWith("past")
       ? "past"
@@ -208,7 +272,7 @@ function worldSource(setting = worldSettings()) {
     : `${setting.world === "past" ? setting.year : meta.year} 年世界银行 WDI 固定截面`;
 }
 function renderArchives() {
-  const lives = history.slice(0, 3);
+  const lives = history.slice(0, 10);
   $("#history-count").textContent = history.length;
   $("#recent-lives").innerHTML = lives.length
     ? lives.map(lifeCard).join("")
@@ -226,13 +290,21 @@ function birth(seed) {
   if (current && current.stage !== "ended") archive(current);
   const bytes = new Uint32Array(1);
   crypto.getRandomValues(bytes);
+  const setting =
+    $("#world-select").value === "any"
+      ? worldSettings(
+          ["today", "past-1970", "past-1990", "past-2010", "future"][
+            (seed || bytes[0]) % 5
+          ],
+        )
+      : worldSettings();
   current = createLife(countries, {
     seed: seed || bytes[0],
     mode: sampling,
     duration,
     origin: $("#origin-select").value,
     gentle: $("#gentle-mode").checked,
-    ...worldSettings(),
+    ...setting,
     reflections: $("#reflection-mode").checked,
   });
   running = false;
@@ -242,60 +314,58 @@ function birth(seed) {
   showRegistration();
 }
 function showRegistration() {
-  const s = current,
-    c = livingCountry(s, countries);
-  modal(
-    "BIRTH REGISTRATION / 出生登记",
-    `<div class="birth-registration"><div class="profile-flag">${flag(c)}</div><h2>你好，${esc(s.name)}。</h2><p class="birth-info">${s.year} 年 · ${esc(c.name)} · ${esc(s.sex)}孩</p><div class="registration-grid"><div><span>你降生的地方</span><strong>${esc(c.name)} · ${esc(s.home)}</strong></div><div><span>你最初的家</span><strong>${esc(s.familyLabel)}</strong></div><div><span>当地预期寿命（${s.deep.world === "past" ? s.year : s.deep.world === "future" ? "2050 假设" : meta.year}）</span><strong>${c.life.toFixed(1)} 岁</strong></div><div><span>这次抽中该地的概率</span><strong>${(weights(s.mode, { world: s.deep.world, year: s.year }).find((x) => x.id === c.id).probability * 100).toFixed(2)}%</strong></div></div><p class="birth-quote">你还不知道，<br>怎样的世界正在等你。</p><p class="field-hint">姓名、家庭及人生经历均为虚构。预期寿命是群体统计，与你实际走过的年岁不同。</p><button class="primary-button full-width" data-action="begin-life">开始这一生 <span>→</span></button><button class="text-button" data-action="share" style="margin-top:17px">分享这个起点 ↗</button></div>`,
+  closeModal();
+  running = false;
+  view = "registration";
+  document.body.dataset.view = view;
+  $("#home-view").classList.add("hidden");
+  $("#game-view").classList.add("hidden");
+  $("#ending-view").classList.add("hidden");
+  $("#registration-view").classList.remove("hidden");
+  const s = current;
+  const probability = weights(s.mode, {
+    world: s.deep.world,
+    year: s.year,
+  }).find((c) => c.id === s.country).probability;
+  $("#registration-view").innerHTML = registrationMarkup(
+    s,
+    countries,
+    land,
+    probability,
+    meta,
   );
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 function renderGame() {
   if (!current) return;
-  const s = current,
-    c = livingCountry(s, countries),
-    isEnded = s.stage === "ended";
-  const stats = [
-    ["health", "健康"],
-    ["happiness", "快乐"],
-    ["knowledge", "知识"],
-    ["relationships", "关系"],
-  ];
-  const events = s.events.slice(-timelineLimit).reverse();
-  const curve = Array.from({ length: 51 }, (_, i) => {
-    const age = i * 2.2,
-      y = 1 / (1 + Math.exp((age - c.life) / 8));
-    return `${i * 4.4},${85 - y * 75}`;
-  }).join(" ");
-  const survival = 1 / (1 + Math.exp((s.age - c.life) / 8));
-  const origin = country(s.origin);
-  $("#game-view").innerHTML =
-    `<div class="game-toolbar"><div class="game-toolbar-left"><button data-action="exit">← 暂存并返回</button><span class="small-index">LIFE NO. ${String(s.seed).padStart(10, "0")}</span></div><div class="game-controls"><button data-action="pause" class="${running ? "active" : ""}" ${isEnded ? "disabled" : ""}>${running ? "Ⅱ 暂停" : "▶ 继续"}</button>${[1, 2, 4, 8, 12, 16].map((n) => `<button data-speed="${n}" class="${speed === n ? "active" : ""}" aria-pressed="${speed === n}">${n}×</button>`).join("")}<button data-action="next-year" ${isEnded ? "disabled" : ""}>下一年</button><button data-action="next-choice" ${isEnded ? "disabled" : ""}>下个选择 ↠</button><button data-action="auto" class="${s.auto ? "active" : ""}" aria-pressed="${Boolean(s.auto)}">自动 ${s.auto ? "开" : "关"}</button><button data-action="music" aria-pressed="${musicOn}">${musicOn ? "♫" : "♪"} 音乐</button></div></div>
-  <div class="game-grid"><aside class="profile-card"><div class="profile-identity"><div class="profile-flag">${flag(c)}</div><h1>${esc(s.name)}</h1><p class="profile-country">${esc(country(s.country).name)} · ${s.year} 年出生 · ${esc(s.sex)}</p><div class="age-display"><strong>${s.age}</strong><span>岁 / ${s.year + s.age}</span></div><p class="life-stage">${stageName(s.age)}</p></div><div class="profile-stats">${stats.map(([key, label]) => `<div class="stat-row"><span>${label}</span><span>${Math.round(s[key])} / 100</span></div><div class="stat-track ${key}"><i style="width:${s[key]}%"></i></div>`).join("")}<p class="field-hint">每一项状态都会随生活与选择变化。</p></div><div class="profile-meta"><div><span>家庭</span><b>${esc(s.familyLabel)}</b></div><div><span>学习</span><b>${esc(s.education)}</b></div><div><span>现在</span><b>${esc(s.occupation)}</b></div><div><span>积蓄</span><b>${money(s.money)}</b></div><div><span>年收入</span><b>${money(s.income)}</b></div><div><span>身边的人</span><b>${s.partner ? "有伴侣" : "独自生活"}${s.children ? " · " + s.children + " 个孩子" : ""}</b></div><div><span>住处</span><b>${esc(s.housing)}</b></div></div><div class="focus-box"><label for="focus-select">这一年，把心思放在…</label><select id="focus-select" ${isEnded ? "disabled" : ""}>${[
-    ["balanced", "平衡生活"],
-    ["health", "照顾身体"],
-    ["study", "学习新知"],
-    ["connection", "陪伴家人与朋友"],
-    ["work", "努力工作"],
-    ["rest", "休息与感受快乐"],
-  ]
-    .map(
-      ([k, n]) =>
-        `<option value="${k}" ${s.focus === k ? "selected" : ""}>${n}</option>`,
-    )
-    .join(
-      "",
-    )}</select><p>专注会逐年影响状态。金额为简化模型下的 PPP 国际元，不是实际工资或资产。</p></div></aside>
-  <section class="story-column">${s.pending ? '<div class="pending-banner">人生的一个路口，正在等你。<button data-action="decision">做出选择 →</button></div>' : ""}${isEnded ? '<div class="pending-banner">这段人生已经走到终点。<button data-action="memorial">回望这一生 →</button></div>' : ""}<div class="timeline-heading"><h2>人生，慢慢发生。</h2><span>最新在前 · ☆ 珍藏这一刻</span></div><div class="timeline">${events.map((e) => `<article class="event ${e.type === "decision" ? "decision" : ""}"><div class="event-age">${s.year + e.age} &nbsp; / &nbsp; ${e.age} 岁</div><button class="event-star" data-star="${e.id}" aria-label="${e.star ? "取消珍藏" : "珍藏"}：${esc(e.title)}">${e.star ? "★" : "☆"}</button><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p></article>`).join("")}</div>${s.events.length > timelineLimit ? '<button data-action="more-events" class="timeline-more">看看更早的日子 ↓</button>' : ""}</section>
-  <aside class="game-insights"><section class="insight-card"><h3>与你同时降生的人</h3><p>同一个世界，相似的时间，不同的起点。</p>${s.peers
-    .map((p) => {
-      const pc = country(p.country),
-        gone = s.age >= p.deathAge;
-      return `<div class="peer ${gone ? "gone" : ""}"><span>${flag(pc)}</span><div><b>${esc(p.name)}</b><small>${esc(pc.name)}</small></div><em>${gone ? "止于 " + p.deathAge + " 岁" : s.age + " 岁"}</em></div>`;
-    })
-    .join(
-      "",
-    )}</section><section class="insight-card"><h3>一格一年，一格一生</h3><p>每一个被点亮的小格子，都是你走过的日子。</p><div class="life-squares">${Array.from({ length: 110 }, (_, i) => `<i class="${i < s.age ? "lived" : i === s.age ? "current" : ""}" title="${i} 岁"></i>`).join("")}</div><div class="map-legend"><span>0 岁</span><span>109 岁</span></div></section><section class="insight-card"><h3>时间与人生</h3><p>${esc(c.name)}的预期寿命为 ${c.life.toFixed(1)} 岁。图线仅为围绕该均值的游戏示意，非真实生命表。</p><svg class="survival-chart" viewBox="0 0 220 95" role="img" aria-label="以当地预期寿命为中心的寿命分布示意"><path d="M0 85H220" stroke="var(--line)" fill="none"/><polyline points="${curve}" fill="none" stroke="var(--green)" stroke-width="1.5"/><circle cx="${(s.age / 110) * 220}" cy="${85 - survival * 75}" r="3" fill="var(--accent)"/></svg>${origin ? `<p>你的真实出生地：${esc(origin.name)}<br>当地预期寿命 ${origin.life.toFixed(1)} 岁，与此处相差 ${Math.abs(origin.life - c.life).toFixed(1)} 年。</p>` : ""}<button class="text-button" data-action="share" style="margin-top:13px">分享这段人生 ↗</button></section></aside></div><p class="game-bottom-note">${worldSource({ world: s.deep.world, year: s.year })} · 寿命、姓名、家庭、收入及经历使用游戏模型，不是个人命运预测。${!c.gdp ? "该地 PPP 数据缺失，收入基数采用收入组的游戏估计值。" : ""} 进度自动保存在此浏览器，可在「我的人生」导出。</p>`;
-  decorateGame();
+  const open = $(".game-menu") && !$(".game-menu").hidden;
+  $("#game-view").innerHTML = gameMarkup({
+    s: current,
+    countries,
+    running,
+    speed,
+    timelineLimit,
+    musicOn,
+  });
+  if (innerWidth <= 1250) $(".game-menu").append($(".game-extra-controls"));
+  if (open) {
+    $(".game-menu").hidden = false;
+    $("[data-action=game-menu]").setAttribute("aria-expanded", "true");
+  }
+}
+function showEnding(s) {
+  running = false;
+  endingLife = s;
+  if (view !== "ending") endingOrigin = view;
+  view = "ending";
+  document.body.dataset.view = view;
+  closeModal();
+  for (const id of ["home-view", "game-view", "registration-view"])
+    $("#" + id).classList.add("hidden");
+  $("#ending-view").innerHTML = endingMarkup(s, countries);
+  $("#ending-view").classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "instant" });
+  $("#ending-view [data-action=ending-record]").focus();
 }
 function performStep() {
   if (!current || current.stage !== "living") return;
@@ -311,7 +381,7 @@ function performStep() {
   if (current.stage === "ended") {
     running = false;
     archive(current);
-    showMemory(current);
+    showEnding(current);
   } else if (pauseForReflection()) return;
   else if (current.pending) {
     if (current.auto) autoChoose();
@@ -373,7 +443,7 @@ function showMemory(s) {
     notable = s.events.filter((e) => e.star || e.type === "decision").slice(-5);
   modal(
     "A LIFE, REMEMBERED / 人生的回声",
-    `<div class="memory-card"><div class="memory-symbol">✳</div><h2>${esc(s.name)}</h2><p class="memory-dates">${s.year} — ${ended ? s.year + s.age : "未完"} · ${esc(c.name)} ${flag(c)}</p><p class="memory-summary">${ended ? "从第一次睁开眼睛，到最后一次看见世界。" : "故事停在了这里，但随时可以继续。"}<br>你走过了 ${s.age} 年，${s.partner ? "学会与人相伴，" : ""}${s.children ? "成为一个孩子的依靠，" : ""}也留下了属于自己的痕迹。</p><div class="memory-stats"><div><strong>${s.age}</strong><span>走过的年岁</span></div><div><strong>${s.events.length}</strong><span>被记录的瞬间</span></div><div><strong>${Math.round(s.happiness)}</strong><span>此刻的快乐</span></div></div><textarea id="memory-note" class="memory-note" maxlength="500" placeholder="给这一生，留下一句话…" aria-label="给这一生留下一句话">${esc(s.note)}</textarea><div class="memory-events">${notable.map((e) => `<p><span>${e.age} 岁</span>${esc(e.title)}</p>`).join("")}</div></div><div class="modal-buttons"><button class="small-button" data-action="save-note">保存这句话</button><button class="small-button" data-action="download-card">↓ 保存人生卡片</button></div><div class="modal-buttons">${!ended ? `<button class="primary-button" data-resume-memory="${esc(s.id)}">继续这段人生 →</button>` : ""}<button class="primary-button" data-action="rebirth">再遇见一种人生 ↗</button></div><div class="modal-buttons">${ended ? '<button class="small-button" data-deep="publish-preview">将摘要留在公共纪念馆 ↗</button>' : ""}</div><p class="history-note">${ended ? "这段人生已自动保存在本地档案。" : "这段故事还未结束。"}珍惜每一种生活，也珍惜你自己。</p>`,
+    `<div class="memory-card"><div class="memory-symbol">✳</div><h2>${esc(s.name)}</h2><p class="memory-dates">${s.year} — ${ended ? s.year + s.age : "未完"} · ${esc(c.name)} ${flag(c)}</p><p class="memory-summary">${ended ? "从第一次睁开眼睛，到最后一次看见世界。" : "故事停在了这里，但随时可以继续。"}<br>你走过了 ${s.age} 年，${s.partner ? "学会与人相伴，" : ""}${s.children ? "成为一个孩子的依靠，" : ""}也留下了属于自己的痕迹。</p><div class="memory-stats"><div><strong>${s.age}</strong><span>走过的年岁</span></div><div><strong>${s.events.length}</strong><span>被记录的瞬间</span></div><div><strong>${Math.round(s.happiness)}</strong><span>此刻的快乐</span></div></div><textarea id="memory-note" class="memory-note" maxlength="500" placeholder="给这一生，留下一句话…" aria-label="给这一生留下一句话">${esc(s.note)}</textarea><div class="memory-events">${notable.map((e) => `<p><span>${e.age} 岁</span>${esc(e.title)}</p>`).join("")}</div></div><div class="modal-buttons"><button class="small-button" data-action="save-note">保存这句话</button><button class="small-button" data-action="download-card">↓ 保存人生卡片</button>${ended ? '<button class="small-button" data-action="replay-ending">再看一次人生落幕</button>' : ""}</div><div class="modal-buttons">${!ended ? `<button class="primary-button" data-resume-memory="${esc(s.id)}">继续这段人生 →</button>` : ""}<button class="primary-button" data-action="rebirth">再遇见一种人生 ↗</button></div><div class="modal-buttons">${ended ? '<button class="small-button" data-deep="publish-preview">将摘要留在公共纪念馆 ↗</button>' : ""}</div><p class="history-note">${ended ? "这段人生已自动保存在本地档案。" : "这段故事还未结束。"}珍惜每一种生活，也珍惜你自己。</p>`,
   );
 }
 function saveNote() {
@@ -555,6 +625,10 @@ function about() {
   );
 }
 function confirmNew() {
+  if (!countries.length) {
+    toast("世界数据仍在读取，请稍候再开始。");
+    return;
+  }
   if (current && current.stage !== "ended") {
     modal(
       "ANOTHER POSSIBILITY / 另一个起点",
@@ -592,10 +666,25 @@ function musicToggle() {
   }
 }
 document.addEventListener("click", async (e) => {
-  const target = e.target.closest("button,[data-memory]");
+  const target = e.target.closest("button,[data-memory],[data-action]");
   if (!target) return;
+  if (target.matches("a[data-action]")) e.preventDefault();
+  if (target.dataset.world) {
+    $("#world-select").value =
+      target.dataset.world === "past" ? "past-1990" : target.dataset.world;
+    renderBars();
+    saveSetup();
+    return;
+  }
+  if (target.dataset.focus) {
+    current.focus = target.dataset.focus;
+    save();
+    renderGame();
+    return;
+  }
   if (target.dataset.sampling) {
     setSampling(target.dataset.sampling);
+    saveSetup();
     return;
   }
   if (target.dataset.duration) {
@@ -604,6 +693,7 @@ document.addEventListener("click", async (e) => {
       b.classList.toggle("selected", Number(b.dataset.duration) === duration);
       b.setAttribute("aria-pressed", Number(b.dataset.duration) === duration);
     });
+    saveSetup();
     return;
   }
   if (target.dataset.speed) {
@@ -661,6 +751,38 @@ document.addEventListener("click", async (e) => {
     return;
   }
   switch (target.dataset.action) {
+    case "game-menu": {
+      const menu = $(".game-menu");
+      menu.hidden = !menu.hidden;
+      target.setAttribute("aria-expanded", String(!menu.hidden));
+      break;
+    }
+    case "reflection-toggle": {
+      const d = initSystems(current);
+      d.reflectionsEnabled = !d.reflectionsEnabled;
+      if (!d.reflectionsEnabled && d.reflection !== null) remember(current, "");
+      save();
+      renderGame();
+      break;
+    }
+    case "gentle-toggle":
+      current.gentle = !current.gentle;
+      save();
+      renderGame();
+      break;
+    case "ending-record":
+      if (endingOrigin === "home") showHome();
+      else showGame();
+      showMemory(endingLife);
+      break;
+    case "replay-ending": {
+      const life = selectedMemory();
+      if (life && life.stage === "ended") {
+        saveNote();
+        showEnding(life);
+      }
+      break;
+    }
     case "reload":
       location.reload();
       break;
@@ -743,7 +865,7 @@ document.addEventListener("click", async (e) => {
       renderGame();
       if (current.stage === "ended") {
         archive(current);
-        showMemory(current);
+        showEnding(current);
       } else if (!pauseForReflection()) showDecision();
       break;
     case "auto":
@@ -793,12 +915,31 @@ document.addEventListener("change", (e) => {
   if (e.target.id === "focus-select" && current) {
     current.focus = e.target.value;
     save();
+    renderGame();
     toast("接下来的一年，会多留一点心思在这里。");
   }
   if (e.target.id === "world-select") renderBars();
+  if (
+    [
+      "world-select",
+      "origin-select",
+      "gentle-mode",
+      "reflection-mode",
+    ].includes(e.target.id)
+  )
+    saveSetup();
 });
 document.addEventListener("input", (e) => {
   if (e.target.id === "country-search") renderDataRows(e.target.value);
+});
+document.addEventListener("keydown", (e) => {
+  const menu = $(".game-menu");
+  if (e.key === "Escape" && !$("#modal").open && menu && !menu.hidden) {
+    menu.hidden = true;
+    const toggle = $("[data-action=game-menu]");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.focus();
+  }
 });
 $("#modal").addEventListener("click", (e) => {
   if (e.target === $("#modal")) {
@@ -854,8 +995,6 @@ setInterval(() => {
   }
 }, 160);
 let land = [],
-  mapFrame = 0,
-  mapPoints = [],
   mapWidth = 0,
   mapHeight = 0;
 function drawMap() {
@@ -896,52 +1035,18 @@ function drawMap() {
       ctx.moveTo(x + 1, y);
       ctx.arc(x, y, 0.9, 0, Math.PI * 2);
     }
-  ctx.globalAlpha = 0.32;
+  ctx.globalAlpha = 0.2;
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
-  mapPoints = countries
-    .filter((c) => c.lat && c.lon && c.birthRate > 0)
-    .map((c) => ({ ...c, point: project([c.lon, c.lat]) }));
-  mapFrame = 0;
-}
-function animateMap() {
-  if (
-    !matchMedia("(prefers-reduced-motion: reduce)").matches &&
-    !document.hidden &&
-    view === "home" &&
-    land.length
-  ) {
-    const canvas = $("#world-map"),
-      ctx = canvas.getContext("2d");
-    if (mapFrame % 100 === 0) drawMap();
-    mapFrame++;
-    const ratio = Math.min(devicePixelRatio || 1, 2);
-    ctx.save();
-    ctx.scale(ratio, ratio);
-    const top = mapPoints.filter((c) => c.population * c.birthRate > 2e9);
-    for (let i = 0; i < Math.min(10, top.length); i++) {
-      const c = top[(i * 7) % top.length],
-        t = ((mapFrame + i * 11) % 100) / 100;
-      ctx.beginPath();
-      ctx.arc(
-        c.point[0],
-        c.point[1],
-        1.6 + Math.sin(t * Math.PI) * 1.7,
-        0,
-        Math.PI * 2,
-      );
-      ctx.fillStyle = i % 3 === 0 ? "#b16c4d" : "#597b5a";
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-  requestAnimationFrame(animateMap);
 }
 let resizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(drawMap, 150);
+  resizeTimer = setTimeout(() => {
+    drawMap();
+    if (view === "game") renderGame();
+  }, 150);
 });
 async function init() {
   try {
@@ -980,7 +1085,8 @@ async function init() {
         )
         .join("");
     $("#birth-button").disabled = false;
-    $("#birth-button").innerHTML = "让这一生，发生 <span>↗</span>";
+    $("#birth-button").innerHTML = "出生";
+    restoreSetup();
     renderBars();
     renderArchives();
     const start = performance.now(),
@@ -1000,7 +1106,12 @@ async function init() {
       .then((data) => {
         land = data;
         drawMap();
-        animateMap();
+        if (view === "registration") {
+          $(".certificate-map").insertAdjacentHTML(
+            "afterbegin",
+            miniMap(land, livingCountry(current, countries)),
+          );
+        }
       })
       .catch(() => {
         $(".map-footnote").textContent =
