@@ -16,7 +16,7 @@ API 测试覆盖来源校验、发布字段、公开响应无管理凭证、点�
 
 ## 浏览器验收
 
-本地四组浏览器测试已通过，页面运行时错误为空：
+本地与 Instabox HTTPS 公网四组浏览器测试均已通过，页面运行时错误为空：
 
 - 基础流程：出生、选择、时间控制、自动、完整人生、刷新恢复、收藏、纪念、PNG、JSON 往返与种子分享。
 - 深度流程：1990 历史起点、私人停顿、家庭、活动、投资、职业、迁居；公共纪念发布、读取、点灯去重、留言、匿名无撤回权限，以及私有档案转移至另一浏览器后撤回。
@@ -28,11 +28,13 @@ API 测试覆盖来源校验、发布字段、公开响应无管理凭证、点�
 
 ## 生产部署与持久化
 
-v3 的生产升级、公网浏览器回归与持久化验收尚在执行，完成后将以实测结果更新本节。此时上一生产版本为 v2.1，不能把旧版结果当作 v3 的公网验收。
+v3 已完成生产升级，部署脚本退出码为 0，Nginx 与 API 健康。公网基础流程实际走至 67 岁结局，另完成种子分享、自动前进、JSON 合并恢复；深度流程验证 1990 年起点、迁居、纪念馆和跨浏览器撤回；边界与六种尺寸界面测试全部通过。测试报告中的错误列表为空，延迟地图补显也在公网通过。
 
-目标地址：[Instabox 在线体验](https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech)，目录 `/data/workspace/birth`，Compose 项目 `birth`。Nginx 与内部 Node API 使用回环端口 8086，HTTPS 由 Instabox 提供；公开纪念数据位于持久卷 `birth_birth-data`。升级保留同域名浏览器存档与公共数据。
+部署地址：[Instabox 在线体验](https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech)，目录 `/data/workspace/birth`，Compose 项目 `birth`。Nginx 与内部 Node API 使用回环端口 8086，HTTPS 由 Instabox 提供；公开纪念数据位于持久卷 `birth_birth-data`。升级保留同域名浏览器存档与公共数据。前端版本为 3.0.0；健康接口中的 `version: 2` 表示 API 版本。
 
-v3 本地构建 SHA-256：`1044f47ee005b8598d2e4c37db28c74cb015ee75f6ed25a8c9058c8155e58d48`，由 `scripts/build.mjs` 写入 `dist/version.json`。该摘要不包含文档。
+升级前保留旧提交、静态资源与一致性快照 `/data/workspace/birth-backups/pre-v3-20261025T132338Z.sqlite`，完整性检查正常。公网回归后实际发布临时纪念，单独重启本项目 API，确认记录仍可读取，再凭管理凭证撤回。通过 `VACUUM INTO` 生成新快照 `/data/workspace/birth-backups/birth-20261025T132803Z.sqlite`，`integrity_check` 为 `ok`，纪念数与在线数据库一致，均为 0。文件名时间为 UTC；测试记录已清理，没有覆盖恢复生产数据库。
+
+v3 静态资源 SHA-256：`1044f47ee005b8598d2e4c37db28c74cb015ee75f6ed25a8c9058c8155e58d48`，由 `scripts/build.mjs` 写入 `dist/version.json`，本地与公网一致。该摘要不包含文档。
 
 ## 范围
 
