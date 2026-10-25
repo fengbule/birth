@@ -37,6 +37,8 @@ with sync_playwright() as p:
         assert_fits(page)
         assert page.locator('#reflection-mode').is_checked()
         assert page.locator('.country-row').count() == 10
+        widths = page.locator('.country-fill').evaluate_all('(xs)=>xs.map(x=>x.getBoundingClientRect().width)')
+        assert abs(widths[-1] - widths[0]) < 2
         page.screenshot(path=str(OUT/f'home-{width}.png'))
         page.locator('[data-world=future]').click()
         expect(page.locator('#data-description')).to_contain_text('2050')
@@ -57,9 +59,19 @@ with sync_playwright() as p:
         assert state['deep']['world'] in ['today', 'past', 'future']
         assert state['duration'] == 90 and state['origin'] == 'CHN'
         assert state['year'] in [1970, 1990, 2010, 2050, 2026]
+        assert page.locator('.certificate-peer-grid > div').count() == 4
         page.screenshot(path=str(OUT/f'certificate-{width}.png'))
         page.locator('[data-action=begin-life]').click()
         page.locator('[data-action=pause]').click()
+        assert not page.locator('#focus-select').is_visible()
+        assert not page.locator('.focus-choices').is_visible()
+        assert page.locator('.life-squares i').count() == 70
+        page.locator('.event h3').first.click()
+        expect(page.locator('.event').first).to_have_attribute('aria-expanded','true')
+        page.locator('.event-star').first.click()
+        expect(page.locator('.event-star').first).to_have_attribute('aria-pressed','true')
+        page.locator('.event').first.press('Enter')
+        expect(page.locator('.event').first).to_have_attribute('aria-expanded','false')
         assert_fits(page)
         if width <= 650:
             scene_y = page.locator('.scene-card').bounding_box()['y']
@@ -67,6 +79,12 @@ with sync_playwright() as p:
             identity_y = page.locator('.identity-card').bounding_box()['y']
             assert scene_y < timeline_y < identity_y
             assert page.locator('.compact-stats').is_visible()
+            assert page.locator('.panel-collapse:visible').count() == 6
+            page.locator('.panel-collapse[data-panel="1"]').click()
+            assert not page.locator('.profile-stats').is_visible()
+            page.locator('.panel-collapse[data-panel="1"]').press('Enter')
+            assert page.locator('.profile-stats').is_visible()
+            page.evaluate('scrollTo(0,0)')
         elif width >= 1280:
             bounds = [page.locator(x).bounding_box() for x in ['.profile-column','.life-main','.game-insights']]
             assert bounds[0]['x'] < bounds[1]['x'] < bounds[2]['x']
@@ -77,6 +95,10 @@ with sync_playwright() as p:
         page.keyboard.press('Escape')
         assert not page.locator('.game-menu').is_visible()
         page.locator('[data-action=next-choice]').click()
+        assert page.locator('#modal').bounding_box()['width'] <= 561
+        page.locator('[aria-label="收起当前抉择"]').click()
+        assert page.locator('.age-display strong').inner_text() == '6'
+        page.locator('[data-action=decision]').click()
         page.locator('[data-choice="0"]').click()
         page.locator('[data-focus=health]').click()
         assert page.locator('[data-focus=health]').get_attribute('aria-pressed') == 'true'
@@ -87,6 +109,11 @@ with sync_playwright() as p:
         click_action(page, 'theme')
         assert page.locator('body').evaluate('(x)=>x.classList.contains("dark")')
         assert_fits(page)
+        if width == 1920:
+            page.locator('[data-action=next-choice]').click()
+            page.locator('[data-action=choice-auto]').click()
+            assert not page.locator('#modal').is_visible()
+            assert page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).current.auto") is True
         if width == 390:
             page.screenshot(path=str(OUT/'mobile-menu-dark.png'))
             click_action(page, 'theme')
@@ -106,5 +133,5 @@ with sync_playwright() as p:
         results.append({'width': width, 'overflow': False, 'world': state['deep']['world'], 'year': state['year']})
         ctx.close()
     assert not errors, errors
-    print(json.dumps({'viewports': results, 'runtimeErrors': errors, 'endingReplayAndSkip': True, 'delayedMapRecovered': True}))
+    print(json.dumps({'viewports': results, 'runtimeErrors': errors, 'endingReplayAndSkip': True, 'delayedMapRecovered': True, 'comparisonRegressions': ['infantFocusHidden','birthPeers','barScale','lifeGrid','expandAndStar','mobileCollapse','choiceCollapse','choiceAuto']}))
     browser.close()

@@ -4,7 +4,7 @@
 
 **[在线体验](https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech)** · [深入玩法](docs/GAMEPLAY.md) · [数据与署名](DATA-SOURCES.md) · [验收记录](docs/VERIFICATION.md) · [原站差异审计](docs/PARITY-AUDIT.md)
 
-v3 按原站公开中文版重做首页、出生登记、身份卡与三栏游戏界面，并适配手机操作。当前仍未通过“一模一样”的验收：文字和像素场景独立制作，统计来源、寿命及事件规则不同，付费纪念品与前世之家未实现，详见差异审计。
+v3.0.1 经双站实际操作对照后修复八类展示与交互问题，见 [实测对照](docs/LIVE-COMPARISON.md)。v3 按原站公开中文版重做首页、出生登记、身份卡与三栏游戏界面，并适配手机操作。当前仍未通过“一模一样”的验收：文字和像素场景独立制作，统计来源、寿命及事件规则不同，付费纪念品与前世之家未实现，详见差异审计。
 
 按全球出生人数或现有人口抽取出生地，从童年走到暮年。公开统计提供起点，选择续写虚构人生。
 
@@ -77,6 +77,7 @@ python tests/browser_smoke.py
 python tests/browser_deep.py
 python tests/browser_edges.py
 python tests/browser_presentation.py
+python tests/browser_compare.py
 ```
 
 `BIRTH_TEST_URL` 指定站点，`CHROMIUM_PATH` 指定浏览器，`BIRTH_TEST_OUTPUT` 指定截图目录。深度测试会短暂发布一段注明测试用途的虚构摘要，成功后撤回；基础测试只写独立浏览器上下文。请使用测试环境或自行拥有的部署。

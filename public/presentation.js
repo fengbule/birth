@@ -137,7 +137,7 @@ export function registrationMarkup(s, countries, land, probability, meta) {
     )
     .join(
       "",
-    )}</div><div class="certificate-map">${miniMap(land, c)}<p>${esc(c.name)}在世界上的位置</p></div><p class="birth-probability">以本次选定的抽样方式，有 <b>${(probability * 100).toFixed(2)}%</b> 的可能来到${esc(c.name)}。</p>${origin ? `<table class="birth-comparison"><caption>与你实际出生的地方相比</caption><thead><tr><th>统计起点</th><th>${esc(origin.name)}</th><th>${esc(c.name)}</th></tr></thead><tbody><tr><td>预期寿命</td><td>${origin.life.toFixed(1)} 岁</td><td>${c.life.toFixed(1)} 岁</td></tr><tr><td>人均 GDP（PPP）</td><td>${origin.gdp ? amount(origin.gdp) : "—"}</td><td>${c.gdp ? amount(c.gdp) : "—"}</td></tr></tbody></table>` : ""}<p class="certificate-note">姓名、家庭和人生经历均为虚构。群体统计不决定个人的命运。</p><div class="certificate-actions"><button class="small-button" data-action="exit">暂存并返回</button><button class="small-button" data-action="share">分享出生起点</button><button class="primary-button" data-action="begin-life">开始这一生</button></div></div></article>`;
+    )}</div><div class="certificate-map">${miniMap(land, c)}<p>${esc(c.name)}在世界上的位置</p></div><p class="birth-probability">以本次选定的抽样方式，有 <b>${(probability * 100).toFixed(2)}%</b> 的可能来到${esc(c.name)}。</p>${origin ? `<table class="birth-comparison"><caption>与你实际出生的地方相比</caption><thead><tr><th>统计起点</th><th>${esc(origin.name)}</th><th>${esc(c.name)}</th></tr></thead><tbody><tr><td>预期寿命</td><td>${origin.life.toFixed(1)} 岁</td><td>${c.life.toFixed(1)} 岁</td></tr><tr><td>人均 GDP（PPP）</td><td>${origin.gdp ? amount(origin.gdp) : "—"}</td><td>${c.gdp ? amount(c.gdp) : "—"}</td></tr></tbody></table>` : ""}<section class="certificate-peers"><h3>与你同时来到世界的人</h3><div class="certificate-peer-grid">${s.peers.map((p) => `<div><b>${esc(p.name)}</b><span>${esc(countries.find((c) => c.id === p.country).name)}</span></div>`).join("")}</div><p class="setting-hint">四个不同的起点，也会和这一生一起向前。</p></section><p class="certificate-note">姓名、家庭和人生经历均为虚构。群体统计不决定个人的命运。</p><div class="certificate-actions"><button class="small-button" data-action="exit">暂存并返回</button><button class="small-button" data-action="share">分享出生起点</button><button class="primary-button" data-action="begin-life">开始这一生</button></div></div></article>`;
 }
 
 export function gameMarkup({
@@ -147,6 +147,7 @@ export function gameMarkup({
   speed,
   timelineLimit,
   musicOn,
+  expandedEvents = new Set(),
 }) {
   const c = livingCountry(s, countries),
     d = initSystems(s),
@@ -175,7 +176,7 @@ export function gameMarkup({
    .reverse()
    .map(
      (e) =>
-       `<article class="event ${e.type === "decision" ? "decision" : ""}"><span class="event-age">${e.age}岁</span><div><button class="event-star" data-star="${e.id}" aria-label="${e.star ? "取消珍藏" : "珍藏"}：${esc(e.title)}">${e.star ? "★" : "☆"}</button><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p></div></article>`,
+       `<article class="event ${e.type === "decision" ? "decision" : ""}" data-action="event-expand" data-eventid="${e.id}" tabindex="0" aria-expanded="${expandedEvents.has(s.id + ":" + e.id)}"><span class="event-age">${e.age}岁</span><div><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p><button class="event-star" data-star="${e.id}" aria-pressed="${Boolean(e.star)}" aria-label="${e.star ? "取消珍藏" : "珍藏"}：${esc(e.title)}">${e.star ? "★ 已收藏" : "☆ 值得记住的时刻"}</button></div></article>`,
    )
    .join(
      "",
@@ -189,7 +190,7 @@ export function gameMarkup({
    })
    .join(
      "",
-   )}</section><section class="insight-card"><h2 class="panel-title">人生地图 <small>一格 = 1年</small></h2><div class="life-squares">${Array.from({ length: 110 }, (_, i) => `<i class="${i < s.age ? "lived" : i === s.age ? "current" : ""}" title="${i} 岁"></i>`).join("")}</div><p class="setting-hint">已经走过 ${s.age} 年 · 当地预期寿命 ${c.life.toFixed(1)} 岁</p></section><section class="insight-card"><h2 class="panel-title">存活曲线</h2><svg class="survival-chart" viewBox="0 0 220 95" role="img" aria-label="寿命分布示意曲线"><path d="M0 85H220" stroke="var(--line)"/><polyline points="${curve}" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg><p class="setting-hint">以当地预期寿命为中心的游戏示意，非真实生命表。</p><button class="text-button" data-action="share">分享出生起点 ↗</button></section></aside></div><p class="game-bottom-note page-width">统计截面：${d.world === "past" ? s.year : d.world === "future" ? "2050 游戏假设" : "2023 WDI"}。人物与事件采用独立游戏规则；完整进度只保存在浏览器。</p>`;
+   )}</section><section class="insight-card"><h2 class="panel-title">人生地图 <small>一格 = 1年</small></h2><div class="life-squares">${Array.from({ length: Math.ceil(Math.max(c.life, s.age + 1) / 10) * 10 }, (_, i) => `<i class="${i < s.age ? "lived" : i === s.age ? "current" : ""} ${i === Math.floor(c.life) ? "life-expectancy" : ""}" title="${i} 岁${i === Math.floor(c.life) ? " · 当地预期寿命" : ""}"></i>`).join("")}</div><p class="setting-hint">已经走过 ${s.age} 年 · 当地预期寿命 ${c.life.toFixed(1)} 岁</p></section><section class="insight-card"><h2 class="panel-title">存活曲线</h2><svg class="survival-chart" viewBox="0 0 220 95" role="img" aria-label="寿命分布示意曲线"><path d="M0 85H220" stroke="var(--line)"/><polyline points="${curve}" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg><p class="setting-hint">以当地预期寿命为中心的游戏示意，非真实生命表。</p><button class="text-button" data-action="share">分享出生起点 ↗</button></section></aside></div><p class="game-bottom-note page-width">统计截面：${d.world === "past" ? s.year : d.world === "future" ? "2050 游戏假设" : "2023 WDI"}。人物与事件采用独立游戏规则；完整进度只保存在浏览器。</p>`;
 }
 
 export function endingMarkup(s, countries) {

@@ -70,6 +70,8 @@ let lastTick = performance.now(),
   music = null,
   musicNodes = [],
   musicOn = false;
+const expandedEvents = new Set();
+const collapsedPanels = new Set();
 try {
   const stored = JSON.parse(localStorage.getItem(PREF) || "{}");
   preferences =
@@ -162,6 +164,11 @@ function archive(s) {
 function modal(kicker, html) {
   $("#modal-kicker").textContent = kicker;
   $("#modal-content").innerHTML = html;
+  const choice = Boolean($("#modal-content .choices"));
+  $("#modal").classList.toggle("choice-dialog", choice);
+  const dismiss = $(".modal-heading [data-action=close]");
+  dismiss.textContent = choice ? "先收起来 ▾" : "×";
+  dismiss.setAttribute("aria-label", choice ? "收起当前抉择" : "关闭对话框");
   if (!$("#modal").open) $("#modal").showModal();
 }
 function closeModal() {
@@ -246,7 +253,7 @@ function renderBars() {
           `<div class="country-row"><span class="country-label">${esc(c.name)}</span><div class="country-track"><div class="country-fill" style="width:${(c.probability / max) * 100}%"></div></div><span class="country-pct">${(c.probability * 100).toFixed(1)}%</span></div>`,
       )
       .join("") +
-    `<div class="country-row other-countries"><span class="country-label">其余 ${rows.length - 9} 个地区</span><div class="country-track"><div class="country-fill" style="width:${rows.slice(9).reduce((sum, c) => sum + c.probability, 0) * 100}%"></div></div><span class="country-pct">${(rows.slice(9).reduce((sum, c) => sum + c.probability, 0) * 100).toFixed(1)}%</span></div>`;
+    `<div class="country-row other-countries"><span class="country-label">其余 ${rows.length - 9} 个地区</span><div class="country-track"><div class="country-fill" style="width:${Math.min(1, rows.slice(9).reduce((sum, c) => sum + c.probability, 0) / max) * 100}%"></div></div><span class="country-pct">${(rows.slice(9).reduce((sum, c) => sum + c.probability, 0) * 100).toFixed(1)}%</span></div>`;
   const setting = worldSettings();
   $("#data-description").textContent =
     `${setting.world === "past" ? setting.year : setting.world === "future" ? "2050 情景假设" : meta.year} 年${setting.world === "future" ? "游戏情景" : "世界银行 WDI"} · ${rows.length} 个国家和地区`;
@@ -346,8 +353,22 @@ function renderGame() {
     speed,
     timelineLimit,
     musicOn,
+    expandedEvents,
   });
   if (innerWidth <= 1250) $(".game-menu").append($(".game-extra-controls"));
+  document.querySelectorAll(".identity-card,.profile-card,.game-insights .insight-card").forEach((panel, index) => {
+    const heading = panel.querySelector(".panel-title,.identity-band");
+    const toggle = document.createElement("button");
+    const collapsed = collapsedPanels.has(index);
+    toggle.className = "panel-collapse";
+    toggle.dataset.action = "panel-collapse";
+    toggle.dataset.panel = index;
+    toggle.textContent = collapsed ? "▸" : "▾";
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    toggle.setAttribute("aria-label", (collapsed ? "展开" : "收起") + heading.textContent.trim().split(/\s/)[0]);
+    panel.classList.toggle("is-collapsed", collapsed);
+    heading.append(toggle);
+  });
   if (open) {
     $(".game-menu").hidden = false;
     $("[data-action=game-menu]").setAttribute("aria-expanded", "true");
@@ -396,8 +417,8 @@ function showDecision() {
       : decisions.find((d) => d.age === current.pending);
   if (!d) return;
   modal(
-    "A TURN IN YOUR LIFE / 人生的路口",
-    `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p><div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><b>${esc(c.title)} <span>↗</span></b><small>${esc(c.hint)}</small></button>`).join("")}</div><p class="decision-footnote">没有标准答案。选择会改变状态、关系与经济状况，结果也受环境和运气影响。关闭窗口后，时间会停在这里等你。</p>`,
+    "重大抉择",
+    `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p><div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><b>${esc(c.title)} <span>↗</span></b><small>${esc(c.hint)}</small></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。选择会改变状态、关系与经济状况，结果也受环境和运气影响。收起窗口后，时间会停在这里等你。</p>`,
   );
 }
 function autoChoose() {
@@ -751,6 +772,29 @@ document.addEventListener("click", async (e) => {
     return;
   }
   switch (target.dataset.action) {
+    case "panel-collapse": {
+      const index = Number(target.dataset.panel);
+      if (collapsedPanels.has(index)) collapsedPanels.delete(index);
+      else collapsedPanels.add(index);
+      renderGame();
+      $(".panel-collapse[data-panel='" + index + "']").focus({ preventScroll: true });
+      break;
+    }
+    case "event-expand": {
+      const key = current.id + ":" + target.dataset.eventid;
+      if (expandedEvents.has(key)) expandedEvents.delete(key);
+      else expandedEvents.add(key);
+      renderGame();
+      $("[data-eventid='" + target.dataset.eventid + "']").focus({ preventScroll: true });
+      break;
+    }
+    case "choice-auto":
+      current.auto = true;
+      running = true;
+      closeModal();
+      autoChoose();
+      lastTick = performance.now();
+      break;
     case "game-menu": {
       const menu = $(".game-menu");
       menu.hidden = !menu.hidden;
@@ -933,6 +977,10 @@ document.addEventListener("input", (e) => {
   if (e.target.id === "country-search") renderDataRows(e.target.value);
 });
 document.addEventListener("keydown", (e) => {
+  if (["Enter", " "].includes(e.key) && e.target.matches("article[data-eventid]")) {
+    e.preventDefault();
+    e.target.click();
+  }
   const menu = $(".game-menu");
   if (e.key === "Escape" && !$("#modal").open && menu && !menu.hidden) {
     menu.hidden = true;

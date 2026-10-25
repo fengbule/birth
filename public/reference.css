@@ -219,8 +219,8 @@ button[hidden],
 }
 .home-probability h2 {
   font-family: var(--serif);
-  font-size: 21px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
   line-height: 1.5;
 }
 .home-data-caption {
@@ -967,6 +967,9 @@ body:not([data-view="home"]) .sticky-birth {
   margin: 0;
   background: var(--surface);
 }
+.focus-select-label.hidden {
+  display: none !important;
+}
 .story-column {
   padding: 16px;
 }
@@ -1015,12 +1018,24 @@ body:not([data-view="home"]) .sticky-birth {
   margin-top: 4px;
   color: var(--muted);
 }
-.event-star {
-  opacity: 0.5;
+.event {
+  cursor: pointer;
 }
-.event:hover .event-star,
-.event-star:focus-visible {
-  opacity: 1;
+.event:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+.event .event-star {
+  display: none;
+  position: static;
+  font-size: 11px;
+  margin-top: 6px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.event[aria-expanded="true"] .event-star {
+  display: inline-block;
 }
 .event.decision {
   background: var(--green-soft);
@@ -1101,6 +1116,10 @@ body:not([data-view="home"]) .sticky-birth {
   background: transparent;
   border: 2px solid var(--accent);
 }
+.life-squares .life-expectancy {
+  outline: 1px solid var(--muted);
+  outline-offset: -1px;
+}
 .game-bottom-note {
   font-size: 11px;
   padding-bottom: 30px;
@@ -1117,7 +1136,91 @@ dialog {
 }
 dialog::backdrop {
   background: #13212a80;
-  backdrop-filter: blur(2px);
+  backdrop-filter: none;
+}
+dialog.choice-dialog {
+  width: min(560px, calc(100% - 24px));
+  padding: 18px;
+}
+.choice-dialog .modal-heading {
+  border-bottom: 1px solid var(--line);
+  padding: 0 0 12px;
+  margin-bottom: 14px;
+}
+.choice-dialog .modal-heading .icon-button {
+  width: auto;
+  height: auto;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+}
+.choice-dialog .modal-title {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+.choice-auto {
+  text-align: center;
+  margin-top: 12px;
+}
+.certificate-peers {
+  margin-top: 20px;
+}
+.certificate-peers h3 {
+  font: 600 16px var(--serif);
+  margin-bottom: 12px;
+}
+.certificate-peer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.certificate-peer-grid > div {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 3px;
+}
+.certificate-peer-grid b, .certificate-peer-grid span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.certificate-peer-grid span {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.panel-collapse {
+  display: none;
+}
+@media (max-width: 650px) {
+  .panel-title, .identity-band {
+    position: relative;
+  }
+  .panel-title:has(.panel-collapse) {
+    padding-right: 36px;
+    min-height: 30px;
+  }
+  .panel-collapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 13px;
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  .identity-band .panel-collapse {
+    position: static;
+    width: 24px;
+    height: 24px;
+    margin-left: 5px;
+  }
+  .is-collapsed > :not(.panel-title):not(.identity-band) {
+    display: none !important;
+  }
 }
 .modal-heading .section-kicker {
   font-size: 11px;
@@ -1538,15 +1641,15 @@ dialog::backdrop {
     font-size: 16px;
   }
   .game-toolbar {
-    padding: 8px 0;
+    padding: 10px 0;
   }
   .game-toolbar-inner {
-    width: calc(100% - 24px);
+    width: calc(100% - 32px);
     display: block;
   }
   .game-heading {
     gap: 10px;
-    margin-bottom: 7px;
+    margin-bottom: 12px;
   }
   .game-heading > a {
     font-size: 15px;
@@ -1568,7 +1671,7 @@ dialog::backdrop {
   .game-controls button {
     font-size: 11px;
     padding: 6px 7px;
-    min-height: 32px;
+    min-height: 40px;
   }
   .speed-controls {
     gap: 2px;
@@ -1582,7 +1685,7 @@ dialog::backdrop {
   .game-controls > .menu-toggle {
     display: block;
     min-width: 31px;
-    min-height: 32px;
+    min-height: 40px;
   }
   .game-menu {
     width: calc(100% - 24px);
@@ -1606,7 +1709,7 @@ dialog::backdrop {
     flex-wrap: wrap;
   }
   .game-grid {
-    width: calc(100% - 24px);
+    width: calc(100% - 32px);
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -1642,7 +1745,7 @@ dialog::backdrop {
     margin-bottom: 12px;
   }
   .panel-title {
-    font-size: 16px;
+    font-size: 20px;
     margin-bottom: 10px;
   }
   .stat-line {
@@ -1665,8 +1768,8 @@ dialog::backdrop {
     margin-bottom: 12px;
   }
   .scene-caption {
-    font-size: 12px;
-    padding: 9px 12px;
+    font-size: 14px;
+    padding: 10px 13px;
   }
   .focus-box,
   .story-column,
@@ -1683,7 +1786,7 @@ dialog::backdrop {
     padding: 8px;
   }
   .timeline-heading h2 {
-    font-size: 16px;
+    font-size: 20px;
   }
   .timeline-heading > span {
     font-size: 9px;
