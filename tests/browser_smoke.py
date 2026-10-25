@@ -92,7 +92,7 @@ with sync_playwright() as p:
     page.locator('[data-action=begin-life]').click()
     page.locator('[data-action=auto]').click()
     page.locator('[data-speed="16"]').click()
-    for attempt in range(50):
+    for attempt in range(200):
         if int(page.locator('.age-display strong').inner_text())>=8:break
         page.wait_for_timeout(200)
     assert int(page.locator('.age-display strong').inner_text())>=8

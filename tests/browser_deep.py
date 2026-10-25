@@ -100,16 +100,35 @@ with sync_playwright() as p:
         other.get_by_text('愿每一种人生都被温柔看见。',exact=True).wait_for()
         assert other.evaluate('document.documentElement.scrollWidth<=innerWidth')
         other.screenshot(path=str(OUT/'public-memorial-mobile.png'),full_page=True)
-        page.locator('[data-deep=confirm-delete-memorial]').click()
-        page.locator('[data-deep=delete-memorial]').click()
-        page.get_by_role('heading',name='每一种人生，都被看见。').wait_for()
+        assert other.locator('[data-deep=confirm-delete-memorial]').count()==0
+        page.locator('[data-action=close]').click()
+        page.locator('[data-action=history]').first.click()
+        with page.expect_download() as archive:
+            page.locator('[data-action=export]').click()
+        private_archive=OUT/'private-transfer-test.json'
+        archive.value.save_as(str(private_archive))
+        exported=json.loads(private_archive.read_text('utf-8'))
+        assert exported['memorialOwners'][public_id]==tokens[public_id]
+        moved=b.new_context(viewport={'width':390,'height':844})
+        restored=moved.new_page();restored.on('pageerror',lambda e:errors.append(str(e)))
+        restored.goto(BASE,wait_until='networkidle')
+        restored.locator('[data-action=history]').first.click()
+        with restored.expect_file_chooser() as chooser:
+            restored.locator('[data-action=import]').click()
+        chooser.value.set_files(str(private_archive))
+        expect(restored.locator('#toast')).to_contain_text('档案已合并')
+        restored.goto(BASE+'/?memorial='+public_id,wait_until='networkidle')
+        restored.locator('[data-deep=confirm-delete-memorial]').click()
+        restored.locator('[data-deep=delete-memorial]').click()
+        restored.get_by_role('heading',name='每一种人生，都被看见。').wait_for()
         assert page.request.get(BASE+'/api/memorials/'+public_id).status==404
+        private_archive.unlink()
         page.locator('[data-action=close]').click()
         page.locator('[data-action=exit]').click()
         page.set_viewport_size({'width':390,'height':844})
         page.locator('#resume-button').count()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-        print(json.dumps({'runtimeErrors':errors,'year':state['year'],'migratedTo':target,'publicFixtureRemoved':True},ensure_ascii=False))
+        print(json.dumps({'runtimeErrors':errors,'year':state['year'],'migratedTo':target,'publicFixtureRemoved':True,'ownershipTransferred':True},ensure_ascii=False))
         assert not errors,errors
     finally:
         cleanup=page.request.delete(BASE+'/api/memorials/'+public_id,headers={'Authorization':'Bearer '+tokens[public_id]})

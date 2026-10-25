@@ -11,6 +11,7 @@ import {
   remember,
   reflectionQuestions,
 } from "./systems.js";
+import { readOwners as ownerTokens } from "./ownership.js";
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -37,13 +38,6 @@ async function api(path, body, method = "POST", token) {
   const data = await r.json();
   if (!r.ok) throw Error(data.error || "暂时无法连接纪念馆。");
   return data;
-}
-function ownerTokens() {
-  try {
-    return JSON.parse(localStorage.getItem("birth.memorialOwners") || "{}");
-  } catch {
-    return {};
-  }
 }
 export function setupDeepUI(config) {
   app = config;

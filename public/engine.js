@@ -1,5 +1,6 @@
 // The demographic inputs are real. The rules below are deliberately a game,
 // not an actuarial, economic, medical, or individual life prediction model.
+import { appendRecord } from "./records.js";
 import {
   initSystems,
   livingCountry,
@@ -143,7 +144,9 @@ export function createLife(countries, options = {}) {
     year: options.year || 2026,
     age: 0,
     mode: options.mode || "births",
-    duration: [5, 15, 30].includes(options.duration) ? options.duration : 5,
+    duration: [5, 15, 30, 60, 90].includes(options.duration)
+      ? options.duration
+      : 60,
     gentle: options.gentle !== false,
     origin: options.origin || "",
     stage: "registered",
@@ -205,14 +208,7 @@ export function createLife(countries, options = {}) {
   return s;
 }
 export function addEvent(s, title, text, type = "life") {
-  s.events.push({
-    id: s.events.length,
-    age: s.age,
-    title,
-    text,
-    type,
-    star: false,
-  });
+  return appendRecord(s, title, text, type);
 }
 export const decisions = [
   {
@@ -860,6 +856,16 @@ export function validateLife(s, countries) {
   if (s.deathAge < 1 || s.deathAge > 110 || s.year < 1900 || s.year > 2100)
     return false;
   if (
+    !Number.isInteger(s.year) ||
+    !Number.isInteger(s.rng) ||
+    s.rng < 0 ||
+    s.rng > 4294967295 ||
+    !Number.isFinite(s.createdAt)
+  )
+    return false;
+  if (s.stage !== "living" && s.pending !== null) return false;
+  if (s.pending === "scene" && !s.deep) return false;
+  if (
     !["health", "happiness", "knowledge", "relationships"].every(
       (k) => s[k] >= 0 && s[k] <= 100,
     )
@@ -885,7 +891,7 @@ export function validateLife(s, countries) {
   ])
     if (typeof s[k] !== "string" || s[k].length > 150) return false;
   if (
-    ![5, 15, 30].includes(s.duration) ||
+    ![5, 15, 30, 60, 90].includes(s.duration) ||
     ![null, "scene", ...decisions.map((d) => d.age)].includes(s.pending) ||
     (s.pending !== null && s.pending !== "scene" && s.pending !== s.age)
   )
@@ -894,12 +900,13 @@ export function validateLife(s, countries) {
     !Array.isArray(s.events) ||
     s.events.length > 2000 ||
     !s.events.every(
-      (e) =>
+      (e, i) =>
         e &&
         Number.isInteger(e.id) &&
         Number.isInteger(e.age) &&
         e.age >= 0 &&
-        e.age <= 110 &&
+        e.age <= s.age &&
+        (i === 0 || e.id > s.events[i - 1].id) &&
         typeof e.title === "string" &&
         e.title.length < 200 &&
         typeof e.text === "string" &&

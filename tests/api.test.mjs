@@ -32,17 +32,31 @@ test("public memorial lifecycle persists and enforces ownership and candle uniqu
       Origin: "https://evil.example",
     });
     assert.equal(r.status, 403);
-    r = await post("/api/memorials", {}, {
-      Origin: "https://birth.example",
-      "X-Forwarded-Host": "birth.example",
-    });
+    r = await post(
+      "/api/memorials",
+      {},
+      {
+        Origin: "https://birth.example",
+        "X-Forwarded-Host": "birth.example",
+      },
+    );
     assert.equal(r.status, 400); // Accepted origin, rejected payload.
-    r = await post("/api/memorials", {}, {
-      Origin: "https://evil.example",
-      "X-Forwarded-Host": "birth.example",
-    });
+    r = await post(
+      "/api/memorials",
+      {},
+      {
+        Origin: "https://evil.example",
+        "X-Forwarded-Host": "birth.example",
+      },
+    );
     assert.equal(r.status, 403);
     r = await post("/api/memorials", { ...fixture, age: -1 });
+    assert.equal(r.status, 400);
+    r = await post("/api/memorials", {
+      ...fixture,
+      age: 5,
+      moments: [{ age: 18, title: "不可能的未来记录" }],
+    });
     assert.equal(r.status, 400);
     r = await post("/api/memorials", fixture);
     assert.equal(r.status, 201);

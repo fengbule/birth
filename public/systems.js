@@ -1,4 +1,5 @@
 // Independent game systems. All probabilities and prices here are game rules.
+import { appendRecord } from "./records.js";
 const clamp = (n, min = 0, max = 100) => Math.min(max, Math.max(min, n));
 function rng(s) {
   let t = (s.rng += 0x6d2b79f5);
@@ -10,14 +11,7 @@ function rng(s) {
 const base = (c) =>
   c.gdp || { HIC: 50000, UMC: 18000, LMC: 6000, LIC: 2000 }[c.income] || 8000;
 function log(s, title, text, type = "life") {
-  s.events.push({
-    id: s.events.length,
-    age: s.age,
-    title,
-    text,
-    type,
-    star: false,
-  });
+  return appendRecord(s, title, text, type);
 }
 let eras = {};
 export function configureEras(data) {
@@ -809,18 +803,41 @@ export function validateSystems(s, countries) {
     return false;
   if (
     !d.assets ||
-    !Object.values(d.assets).every((n) => finite(n, 0)) ||
+    !["bonds", "stocks", "house", "mortgage"].every((k) =>
+      finite(d.assets[k], 0),
+    ) ||
     !d.career ||
-    !Object.values(d.career).every((n) => finite(n, 0, 200))
+    !["level", "experience", "unemployed"].every(
+      (k) =>
+        Number.isInteger(d.career[k]) &&
+        finite(d.career[k], 0, k === "level" ? 6 : 200),
+    )
   )
     return false;
   if (
     !d.annual ||
-    !finite(d.annual.age, 0, 110) ||
+    !Number.isInteger(d.annual.age) ||
+    !finite(d.annual.age, 0, s.age) ||
     !["income", "expenses", "returns"].every((k) => finite(d.annual[k])) ||
     !Array.isArray(d.annual.actions) ||
     d.annual.actions.length > 3 ||
-    !d.annual.actions.every((a) => text(a, 30))
+    new Set(d.annual.actions).size !== d.annual.actions.length ||
+    !d.annual.actions.every((a) =>
+      [
+        "exercise",
+        "learn",
+        "checkup",
+        "travel",
+        "parents",
+        "partner",
+        "child",
+        "friend",
+        "job",
+        "insurance",
+        "volunteer",
+        "childbirth",
+      ].includes(a),
+    )
   )
     return false;
   if (
@@ -896,6 +913,15 @@ export function validateSystems(s, countries) {
       d.reflection,
     ) ||
     ![null, ...Object.keys(sceneCatalog).map(Number)].includes(d.pendingScene)
+  )
+    return false;
+  if ((s.pending === "scene") !== (d.pendingScene !== null)) return false;
+  if (d.pendingScene !== null && d.pendingScene !== s.age) return false;
+  if (d.reflection !== null && (d.reflection !== s.age || s.stage !== "living"))
+    return false;
+  if (
+    d.world === "past" &&
+    !worldCountries(countries, "past", s.year).some((c) => c.id === d.residence)
   )
     return false;
   if (

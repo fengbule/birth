@@ -23,6 +23,7 @@ import {
   pauseForReflection,
   openPublicMemory,
 } from "./deep-ui.js";
+import { readOwners, validOwners, mergeOwners } from "./ownership.js";
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -50,7 +51,7 @@ let countries = [],
   current = null,
   history = [],
   sampling = "births",
-  duration = 5,
+  duration = 60,
   running = false,
   speed = 1,
   view = "home",
@@ -268,7 +269,7 @@ function renderGame() {
   const survival = 1 / (1 + Math.exp((s.age - c.life) / 8));
   const origin = country(s.origin);
   $("#game-view").innerHTML =
-    `<div class="game-toolbar"><div class="game-toolbar-left"><button data-action="exit">← 暂存并返回</button><span class="small-index">LIFE NO. ${String(s.seed).padStart(10, "0")}</span></div><div class="game-controls"><button data-action="pause" class="${running ? "active" : ""}" ${isEnded ? "disabled" : ""}>${running ? "Ⅱ 暂停" : "▶ 继续"}</button>${[1, 4, 16].map((n) => `<button data-speed="${n}" class="${speed === n ? "active" : ""}" aria-pressed="${speed === n}">${n}×</button>`).join("")}<button data-action="next-year" ${isEnded ? "disabled" : ""}>下一年</button><button data-action="next-choice" ${isEnded ? "disabled" : ""}>下个选择 ↠</button><button data-action="auto" class="${s.auto ? "active" : ""}" aria-pressed="${Boolean(s.auto)}">自动 ${s.auto ? "开" : "关"}</button><button data-action="music" aria-pressed="${musicOn}">${musicOn ? "♫" : "♪"} 音乐</button></div></div>
+    `<div class="game-toolbar"><div class="game-toolbar-left"><button data-action="exit">← 暂存并返回</button><span class="small-index">LIFE NO. ${String(s.seed).padStart(10, "0")}</span></div><div class="game-controls"><button data-action="pause" class="${running ? "active" : ""}" ${isEnded ? "disabled" : ""}>${running ? "Ⅱ 暂停" : "▶ 继续"}</button>${[1, 2, 4, 8, 12, 16].map((n) => `<button data-speed="${n}" class="${speed === n ? "active" : ""}" aria-pressed="${speed === n}">${n}×</button>`).join("")}<button data-action="next-year" ${isEnded ? "disabled" : ""}>下一年</button><button data-action="next-choice" ${isEnded ? "disabled" : ""}>下个选择 ↠</button><button data-action="auto" class="${s.auto ? "active" : ""}" aria-pressed="${Boolean(s.auto)}">自动 ${s.auto ? "开" : "关"}</button><button data-action="music" aria-pressed="${musicOn}">${musicOn ? "♫" : "♪"} 音乐</button></div></div>
   <div class="game-grid"><aside class="profile-card"><div class="profile-identity"><div class="profile-flag">${flag(c)}</div><h1>${esc(s.name)}</h1><p class="profile-country">${esc(country(s.country).name)} · ${s.year} 年出生 · ${esc(s.sex)}</p><div class="age-display"><strong>${s.age}</strong><span>岁 / ${s.year + s.age}</span></div><p class="life-stage">${stageName(s.age)}</p></div><div class="profile-stats">${stats.map(([key, label]) => `<div class="stat-row"><span>${label}</span><span>${Math.round(s[key])} / 100</span></div><div class="stat-track ${key}"><i style="width:${s[key]}%"></i></div>`).join("")}<p class="field-hint">每一项状态都会随生活与选择变化。</p></div><div class="profile-meta"><div><span>家庭</span><b>${esc(s.familyLabel)}</b></div><div><span>学习</span><b>${esc(s.education)}</b></div><div><span>现在</span><b>${esc(s.occupation)}</b></div><div><span>积蓄</span><b>${money(s.money)}</b></div><div><span>年收入</span><b>${money(s.income)}</b></div><div><span>身边的人</span><b>${s.partner ? "有伴侣" : "独自生活"}${s.children ? " · " + s.children + " 个孩子" : ""}</b></div><div><span>住处</span><b>${esc(s.housing)}</b></div></div><div class="focus-box"><label for="focus-select">这一年，把心思放在…</label><select id="focus-select" ${isEnded ? "disabled" : ""}>${[
     ["balanced", "平衡生活"],
     ["health", "照顾身体"],
@@ -362,7 +363,7 @@ function renderDataRows(query = "") {
 function showHistory() {
   modal(
     "THE LIVES WE KEEP / 人生档案",
-    `<h2 class="modal-title">走过的路，都留在这里。</h2><p class="modal-description">${history.length} 段故事${current && current.stage !== "ended" ? "，还有一段正在发生的人生" : ""}。保存在此浏览器，可导出到其他设备。</p><div class="history-actions"><button class="small-button" data-action="export">↓ 导出全部档案</button><button class="small-button" data-action="import">↑ 导入档案</button>${current && current.stage !== "ended" ? '<button class="small-button" data-action="resume">继续当前人生 →</button>' : ""}</div><div class="history-grid">${history.map(lifeCard).join("") || '<div class="empty-archive">第一段人生，正在等待你。</div>'}</div><p class="history-note">最多保留 50 段人生。浏览器清理站点数据会删除本地进度，建议偶尔导出备份。</p>`,
+    `<h2 class="modal-title">走过的路，都留在这里。</h2><p class="modal-description">${history.length} 段故事${current && current.stage !== "ended" ? "，还有一段正在发生的人生" : ""}。保存在此浏览器，可导出到其他设备。档案包含私人记录和公开纪念的撤回凭证，请勿公开分享。</p><div class="history-actions"><button class="small-button" data-action="export">↓ 导出全部档案</button><button class="small-button" data-action="import">↑ 导入档案</button>${current && current.stage !== "ended" ? '<button class="small-button" data-action="resume">继续当前人生 →</button>' : ""}</div><div class="history-grid">${history.map(lifeCard).join("") || '<div class="empty-archive">第一段人生，正在等待你。</div>'}</div><p class="history-note">最多保留 50 段人生。浏览器清理站点数据会删除本地进度，建议偶尔导出备份。</p>`,
   );
 }
 function showMemory(s) {
@@ -412,6 +413,7 @@ function exportData() {
           {
             schema: SCHEMA,
             exportedAt: new Date().toISOString(),
+            memorialOwners: readOwners(),
             current,
             history,
           },
@@ -439,10 +441,12 @@ function importData() {
         data.schema !== SCHEMA ||
         !Array.isArray(data.history) ||
         data.history.length > 50 ||
+        !validOwners(data.memorialOwners ?? {}) ||
         !data.history.every((s) => validateLife(s, countries)) ||
         (data.current !== null && !validateLife(data.current, countries))
       )
         throw Error("档案格式或版本不匹配");
+      mergeOwners(data.memorialOwners);
       let incoming = [...data.history];
       if (data.current) incoming.unshift(data.current);
       const merged = new Map(history.map((x) => [x.id, x]));

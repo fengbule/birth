@@ -27,7 +27,7 @@ docker compose -p birth exec -T api cat "/tmp/birth-$stamp.sqlite" > "/data/work
 docker compose -p birth exec -T api rm "/tmp/birth-$stamp.sqlite"
 ```
 
-备份含公开内容，保存在项目外，按需要保留并复制到独立存储。本仓库提供手动备份命令，不默认设置定时任务。发布者管理凭证只有浏览器持有，服务器存哈希；备份无法恢复丢失的凭证。
+备份含公开内容，保存在项目外，按需要保留并复制到独立存储。本仓库提供手动备份命令，不默认设置定时任务。发布者管理凭证由浏览器持有，2.1 起也包含在其导出的私有 JSON 档案中；服务器存哈希，服务器备份无法恢复丢失的凭证。不要公开用户的 JSON 档案。
 
 ## 从备份恢复
 
