@@ -14,7 +14,7 @@
 
 ## 生产状态
 
-已部署至 <https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech>，前端版本 **3.0.1**。静态内容 SHA-256：`51d8ba5f85407caf0bc92b9487180f5d3bd37d88f5883dea57b569d798755979`。API 健康响应的 `version: 2` 是 API 版本。
+已部署至 <https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech>，前端版本 **3.0.1**。本地按仓库 LF 换行重建后与公网一致，静态内容 SHA-256：`eeef82cbf203d38212e372ef756f9173c435092a32ad5d99380bc8546c44003b`。API 健康响应的 `version: 2` 是 API 版本。
 
 本轮在该公网重新运行以下脚本，均退出 0，页面运行时错误为空：
 
@@ -25,6 +25,8 @@
 - `browser_compare.py`：1440×1000 和 390×844，原站与公网首页、出生、游戏、菜单共八对截图；人工查看截图，保留未对齐项。
 
 生产 API 重启验证完成：虚构纪念记录在重启后存在，随后撤回，最终公共记录数为 0。SQLite 一致性备份 `/data/workspace/birth-backups/birth-20261025T141437Z.sqlite` 的 `PRAGMA integrity_check` 为 `ok`。本轮升级前备份为 `pre-v301-20261025T140055Z.sqlite`，同时保留升级前静态文件与提交号。
+
+最终巡检的 birth、TG archive、relay、Nginx、AkileSign 容器均健康。TG archive 应用在本轮对照期间于 14:11:22 UTC 另有容器替换，因此不宣称所有其他应用容器 ID 都未变化；本项目部署命令范围为 Compose 项目 `birth`。
 
 对照文件位于工作输出 `output/birth-live-compare/`：`report.html` 汇总五组深度走查证据与八组新版公网对照，支持并排和叠加；`public-browser_compare/comparison.json` 保存布局尺寸，原站截图未进入代码仓库。
 
