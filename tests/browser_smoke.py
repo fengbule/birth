@@ -101,6 +101,7 @@ with sync_playwright() as p:
         if int(page.locator('.age-display strong').inner_text())>=8:break
         page.wait_for_timeout(200)
     assert int(page.locator('.age-display strong').inner_text())>=8
+    auto_reached=int(page.locator('.age-display strong').inner_text())
     page.locator('[data-action=pause]').click()
     assert not page.locator('#modal').is_visible()
     click_action(page, 'music')
@@ -133,5 +134,5 @@ with sync_playwright() as p:
     fc.value.set_files(str(out/'test-export.json'))
     page.locator('.history-grid .life-card').nth(1).wait_for()
     assert not errors,errors
-    print(json.dumps({'extraBrowserErrors':errors,'sharedSeedCountry':actual['country'],'autoProgressReached':int(age),'importedHistory':page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).history.length")},ensure_ascii=False))
+    print(json.dumps({'extraBrowserErrors':errors,'sharedSeedCountry':actual['country'],'autoProgressReached':auto_reached,'importedHistory':page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).history.length")},ensure_ascii=False))
     b.close()
