@@ -1,5 +1,5 @@
 """End-to-end gameplay and memorial persistence smoke test; cleans its public fixture."""
-from browser_helpers import click_action, click_tool, finish_ending
+from browser_helpers import click_action, click_tool, finish_ending, next_stop
 from playwright.sync_api import sync_playwright, expect
 from pathlib import Path
 import os,json
@@ -22,7 +22,9 @@ with sync_playwright() as p:
     assert '1990' in page.locator('.birth-info').inner_text()
     page.locator('[data-action=begin-life]').click()
     page.locator('[data-action=pause]').click()
-    page.locator('[data-action=next-choice]').click()
+    next_stop(page)
+    page.locator('[data-choice="0"]').click()
+    next_stop(page)
     assert page.locator('#reflection-text').is_visible()
     page.locator('#reflection-text').fill('认真看见这个人的世界。')
     page.locator('[data-deep=save-reflection]').click()
@@ -35,16 +37,17 @@ with sync_playwright() as p:
             page.locator('[data-choice="'+choice+'"]').click()
         elif page.locator('#reflection-text').is_visible():
             page.locator('[data-deep=skip-reflection]').click()
-        else:page.locator('[data-action=next-choice]').click()
+        else:next_stop(page)
     if page.locator('[data-choice]').first.is_visible():page.locator('[data-choice="0"]').click()
     if page.locator('#reflection-text').is_visible():page.locator('[data-deep=skip-reflection]').click()
     page.screenshot(path=str(OUT/'deep-game-desktop.png'),full_page=True)
-    page.locator('[data-deep=family]').click()
+    click_tool(page,'family')
     assert page.locator('.person-card').count()>=2
     page.screenshot(path=str(OUT/'family-panel.png'))
     page.locator('[data-life-action=parents]').click()
     page.locator('[data-action=close]').click()
     page.locator('[data-deep=finance]').click()
+    page.locator('.portfolio-more summary').click()
     page.locator('#trade-amount').fill('10')
     page.locator('#trade-type').select_option('stocks')
     page.locator('[data-deep=trade]').click()
@@ -73,10 +76,10 @@ with sync_playwright() as p:
         if page.locator('#memory-note').count():break
         if page.locator('[data-choice]').first.is_visible():page.locator('[data-choice="1"]').click()
         elif page.locator('#reflection-text').is_visible():page.locator('[data-deep=skip-reflection]').click()
-        else:page.locator('[data-action=next-choice]').click()
+        else:next_stop(page)
     assert page.locator('#memory-note').is_visible()
     page.locator('#memory-note').fill('自动验收临时人生，完成后撤回。')
-    page.locator('[data-deep=publish-preview]').click()
+    page.get_by_role('button',name='将摘要留在公共纪念馆',exact=True).click()
     assert page.locator('.public-preview').is_visible()
     with page.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/api/memorials')) as publication:
         page.locator('[data-deep=publish]').click()

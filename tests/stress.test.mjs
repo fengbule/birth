@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createLife, step, choose, validateLife } from "../public/engine.js";
+import { createLife, step, choose, validateLife, pendingDecision, decisions } from "../public/engine.js";
+import { consume, consumptionOptions } from "../public/life-events.js";
 import {
   configureEras,
   remember,
@@ -19,7 +20,7 @@ configureEras(
     readFileSync(new URL("../public/data/eras.json", import.meta.url)),
   ),
 );
-test("10000 mixed-world lives survive random actions, investments, migration and reloads", () => {
+test("30000 mixed-world lives survive variable choices, credit, queued offers, investments and reloads", () => {
   const worlds = [
     { world: "today", year: 2026 },
     ...[1970, 1990, 2010].map((year) => ({ world: "past", year })),
@@ -30,7 +31,7 @@ test("10000 mixed-world lives survive random actions, investments, migration and
     moves = 0,
     actions = 0,
     ends = 0;
-  for (let seed = 20001; seed <= 30000; seed++) {
+  for (let seed = 20001; seed <= 50000; seed++) {
     const fixedCountry = seed - 20001 < countries.length;
     const setting = fixedCountry ? worlds[0] : worlds[seed % worlds.length];
     const pool = worldCountries(countries, setting.world, setting.year);
@@ -54,7 +55,7 @@ test("10000 mixed-world lives survive random actions, investments, migration and
       if (s.deep.reflection !== null)
         remember(s, draw() < 0.5 ? "" : "保留这一刻。");
       else if (s.pending) {
-        const choice = Math.floor(draw() * 3);
+        const choice = Math.floor(draw() * pendingDecision(s,countries).choices.length);
         choices.add(
           `${s.pending === "scene" ? s.deep.pendingScene : s.pending}:${choice}`,
         );
@@ -64,6 +65,8 @@ test("10000 mixed-world lives survive random actions, investments, migration and
           Math.floor(draw() * 6)
         ];
         const available = actionList(s, countries);
+        const spending = consumptionOptions(s,countries).filter(i=>!i.disabled);
+        if(spending.length&&draw()<.2)consume(s,spending[Math.floor(draw()*spending.length)].id,countries);
         if (available.length && draw() < 0.65)
           actions += performAction(
             s,
@@ -98,7 +101,8 @@ test("10000 mixed-world lives survive random actions, investments, migration and
     assert.equal(s.stage, "ended", `stuck life ${seed}`);
     ends++;
   }
-  assert.equal(choices.size, 63); // 21 decision ages, each of the three choices.
+  for(const decision of decisions.filter(d=>!d.legacy))
+    for(let i=0;i<decision.choices.length;i++)assert.ok(choices.has(`${decision.age}:${i}`));
   assert.equal(visited.size, countries.length);
   assert.ok(moves > 100);
   assert.ok(actions > 10000);

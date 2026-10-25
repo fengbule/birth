@@ -1,6 +1,9 @@
 // The demographic inputs are real. The rules below are deliberately a game,
 // not an actuarial, economic, medical, or individual life prediction model.
 import { appendRecord } from "./records.js";
+import { experience, recordYear, temperamentName } from "./experience.js";
+import { activateQueuedEvent, queuedDecision, resolveQueuedEvent } from "./life-events.js";
+import { sampleLifetime } from "./mortality.js";
 import {
   initSystems,
   livingCountry,
@@ -9,6 +12,7 @@ import {
   afterChoice,
   resolveScene,
   validateSystems,
+  specialDecision as specialDecisionFor,
 } from "./systems.js";
 export const SCHEMA = 1;
 export const clamp = (n, min = 0, max = 100) => Math.min(max, Math.max(min, n));
@@ -127,11 +131,8 @@ export function incomeBase(c) {
     c.gdp || { HIC: 50000, UMC: 18000, LMC: 6000, LIC: 2000 }[c.income] || 8000
   );
 }
-export function estimatedLifetime(country, state) {
-  const normal =
-    Math.sqrt(-2 * Math.log(Math.max(0.0001, random(state)))) *
-    Math.cos(2 * Math.PI * random(state));
-  return Math.round(clamp(country.life + normal * 11, 30, 108));
+export function estimatedLifetime(country, state, sex = "男", world = "today", year = 2023) {
+  return sampleLifetime(country,sex,random(state),world,year);
 }
 export function createLife(countries, options = {}) {
   const seed = Number(options.seed) >>> 0 || 1;
@@ -176,9 +177,11 @@ export function createLife(countries, options = {}) {
   s.sex = random(s) < 0.488 ? "女" : "男";
   s.name = nameFor(c, s.sex, s);
   s.family = Math.round(random(s) * 100);
-  s.health = Math.round(79 + random(s) * 18);
-  s.happiness = Math.round(62 + random(s) * 20);
-  s.deathAge = estimatedLifetime(c, s);
+  s.health = Math.round(58 + random(s) * 28);
+  s.happiness = Math.round(40 + random(s) * 35);
+  s.knowledge = Math.round(35 + random(s) * 30);
+  s.relationships = Math.round(35 + random(s) * 35);
+  s.deathAge = estimatedLifetime(c, s, s.sex, options.world, s.year);
   s.familyLabel =
     s.family < 22
       ? "经济拮据"
@@ -195,10 +198,12 @@ export function createLife(countries, options = {}) {
     s.peers.push({
       country: p.id,
       name: nameFor(p, sex, s),
-      deathAge: estimatedLifetime(p, s),
+      deathAge: estimatedLifetime(p, s, sex, options.world, s.year),
     });
   }
   initSystems(s, { ...options, reflections: options.reflections === true });
+  experience(s);
+  recordYear(s);
   addEvent(
     s,
     "第一次与世界相遇",
@@ -212,7 +217,19 @@ export function addEvent(s, title, text, type = "life") {
 }
 export const decisions = [
   {
+    age: 2,
+    title: "两岁，第一次主动探索",
+    text: "熟悉的家门外，有许多从未见过的事物。这个孩子会怎样迈出自己的脚步？童年经历会慢慢留下气质的痕迹。",
+    choices: [
+      {title:"停下来研究新鲜的小东西",hint:"好奇与专注",effect:{knowledge:2},result:"你会为了一个小小的发现，安静地看上许久。"},
+      {title:"跑到前面，试试自己能做什么",hint:"活力与主动",effect:{health:2,happiness:2},result:"世界很大，你总想先跑过去看一看。"},
+      {title:"留意身边的人，走过去陪伴",hint:"体贴与连结",effect:{relationships:3},result:"你开始觉察别人的心情，也学着把温柔递出去。"},
+      {title:"遇到挫折后，再自己尝试一次",hint:"耐心与韧性",effect:{happiness:2},result:"你没有马上放弃，慢慢找到了自己的办法。"},
+    ],
+  },
+  {
     age: 6,
+    legacy: true,
     title: "世界，从一间教室开始",
     text: "你到了入学的年纪。家人想知道，你希望怎样度过课后的时光。",
     choices: [
@@ -234,6 +251,16 @@ export const decisions = [
         effect: { relationships: 5, knowledge: 2, family: 5 },
         result: "你学会了照顾家人，也早早懂得了生活的重量。",
       },
+    ],
+  },
+  {
+    age: 7,
+    title: "七岁，发现喜欢做的事",
+    text: "放学后的时间渐渐属于你自己。一个小小的兴趣，可能陪伴你好多年。",
+    choices: [
+      {title:"读书、提问，弄懂新事物",hint:"学习与好奇",effect:{knowledge:8},result:"你为自己的问题找到了更多答案，也发现了新的问题。"},
+      {title:"画画、唱歌，试着表达自己",hint:"创作与感受",effect:{happiness:7,knowledge:3},result:"你开始把看到的世界，变成自己的画面和声音。"},
+      {title:"和朋友到户外活动",hint:"运动与友谊",effect:{health:5,relationships:5},result:"在一起玩耍的日子里，你找到了小小的快乐。"},
     ],
   },
   {
@@ -630,7 +657,7 @@ export function step(s, countries) {
   if (s.stage !== "living" || s.pending || deep.reflection !== null) return s;
   const c = livingCountry(s, countries);
   if (!c) throw Error("Country missing");
-  s.age++;
+  if (s.deathAge > 0) s.age++;
   const r = () => random(s);
   s.health = clamp(
     s.health - (s.age > 50 ? 0.8 : s.age > 30 ? 0.35 : 0.05) + (r() - 0.5) * 2,
@@ -648,6 +675,8 @@ export function step(s, countries) {
         ? { money: incomeBase(c) * 0.02, health: -0.3, knowledge: 0.4 }
         : { knowledge: 1 },
     rest: { happiness: 1.6, health: 0.5 },
+    help: { relationships: 1.5, family: 0.4, knowledge: -0.2 },
+    jobprep: { knowledge: 1.5, happiness: -0.2 },
     balanced: {
       health: 0.4,
       knowledge: 0.4,
@@ -655,10 +684,14 @@ export function step(s, countries) {
       happiness: 0.3,
     },
   };
-  applyEffects(s, focus[s.focus] || focus.balanced);
+  if (s.age >= 6) applyEffects(s, focus[s.focus] || focus.balanced);
+  if (s.age === 4 && experience(s).childhoodChoice !== null)
+    addEvent(s, "慢慢长成自己的样子", `这个孩子的气质渐渐清晰：${temperamentName(s)}。童年的选择仍会和之后的经历一起，塑造不同的可能。`, "childhood");
   if (s.age === 6) {
     s.education = "基础教育";
     s.occupation = "学生";
+    if (s.focus === "balanced") s.focus = "study";
+    addEvent(s,"第一次走进教室","你开始了学校里的日子，认识老师、同学，也慢慢接触更大的世界。","education");
   }
   if (s.age === 22 && s.education === "大学在读") {
     s.education = "大学毕业";
@@ -685,6 +718,9 @@ export function step(s, countries) {
     s.stage = "ended";
     s.pending = null;
     s.income = 0;
+    const causes = s.age<1 ? ["早产并发症","新生儿感染"] : s.age<15 ? ["呼吸道感染","腹泻疾病","感染性疾病"] : s.age<80 ? ["心血管疾病","恶性肿瘤","呼吸系统疾病"] : ["高龄相关的身体衰弱","心血管疾病","呼吸系统疾病"];
+    experience(s).cause ||= causes[(s.seed+s.age)%causes.length];
+    recordYear(s);
     addEvent(
       s,
       "这一生，轻轻合上了书页",
@@ -709,9 +745,11 @@ export function step(s, countries) {
       "一场疾病让你停下脚步。休息与照料，成为这段时间最重要的事。",
     );
   }
-  const d = decisions.find((d) => d.age === s.age);
+  const d = decisions.find((d) => d.age === s.age && (!d.legacy || !s.deep.experience));
   if (d) s.pending = d.age;
   yearSystems(s, countries);
+  activateQueuedEvent(s);
+  recordYear(s);
   if (s.age % 10 === 0 && !d)
     addEvent(
       s,
@@ -722,12 +760,22 @@ export function step(s, countries) {
 }
 export function choose(s, index, countries) {
   if (s.stage !== "living") return false;
+  if (s.pending === "life-event") {
+    const resolved=resolveQueuedEvent(s,index,countries);
+    if(resolved){s.income=annualIncome(s,livingCountry(s,countries));recordYear(s);}
+    return resolved;
+  }
   if (s.pending === "scene") return resolveScene(s, index, countries);
   const d = decisions.find((d) => d.age === s.pending),
     choice = d?.choices[index];
   if (!choice) return false;
   const c = livingCountry(s, countries);
   let result = choice.result;
+  if (d.age === 2) {
+    const x = experience(s);
+    x.childhoodChoice = index;
+    x.temperament[index] = Math.min(100, x.temperament[index] + 25);
+  }
   applyEffects(s, choice.effect);
   Object.assign(s, choice.set || {});
   switch (choice.special) {
@@ -801,7 +849,16 @@ export function choose(s, index, countries) {
   addEvent(s, d.title, result, "decision");
   s.pending = null;
   afterChoice(s, countries);
+  activateQueuedEvent(s);
+  recordYear(s);
   return true;
+}
+export function pendingDecision(s,countries) {
+  if (!s?.pending) return null;
+  if (s.pending === "life-event") return queuedDecision(s,countries);
+  const d = s.pending === "scene" ? specialDecisionFor(s) : decisions.find(d=>d.age===s.pending);
+  if (d?.age !== 2 || s.seed % 2 === 0) return d;
+  return {...d,title:"两岁，家里来了新面孔",text:"家里来了几位不熟悉的客人。有人聊天，有人在门边招手。你会怎样认识这些新面孔？"};
 }
 export function stageName(age) {
   return age < 6
@@ -853,7 +910,7 @@ export function validateLife(s, countries) {
     "schoolQuality",
   ])
     if (!Number.isFinite(s[k]) || Math.abs(s[k]) > 1e10) return false;
-  if (s.deathAge < 1 || s.deathAge > 110 || s.year < 1900 || s.year > 2100)
+  if (s.deathAge < 0 || s.deathAge > 110 || s.year < 1900 || s.year > 2100)
     return false;
   if (
     !Number.isInteger(s.year) ||
@@ -865,6 +922,7 @@ export function validateLife(s, countries) {
     return false;
   if (s.stage !== "living" && s.pending !== null) return false;
   if (s.pending === "scene" && !s.deep) return false;
+  if (s.pending === "life-event" && !s.deep?.experience?.activeEvent) return false;
   if (
     !["health", "happiness", "knowledge", "relationships"].every(
       (k) => s[k] >= 0 && s[k] <= 100,
@@ -892,8 +950,8 @@ export function validateLife(s, countries) {
     if (typeof s[k] !== "string" || s[k].length > 150) return false;
   if (
     ![5, 15, 30, 60, 90].includes(s.duration) ||
-    ![null, "scene", ...decisions.map((d) => d.age)].includes(s.pending) ||
-    (s.pending !== null && s.pending !== "scene" && s.pending !== s.age)
+    ![null, "scene", "life-event", ...decisions.map((d) => d.age)].includes(s.pending) ||
+    (s.pending !== null && !["scene","life-event"].includes(s.pending) && s.pending !== s.age)
   )
     return false;
   if (
@@ -923,7 +981,7 @@ export function validateLife(s, countries) {
         typeof p.name === "string" &&
         p.name.length < 100 &&
         Number.isFinite(p.deathAge) &&
-        p.deathAge >= 1 &&
+        p.deathAge >= 0 &&
         p.deathAge <= 110,
     )
   )

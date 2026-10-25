@@ -1,6 +1,6 @@
 """Responsive presentation and new controls, without public API mutations."""
 from playwright.sync_api import sync_playwright, expect
-from browser_helpers import click_action, finish_ending
+from browser_helpers import click_action, finish_ending, next_stop
 from pathlib import Path
 import json, os
 
@@ -10,7 +10,12 @@ OUT.mkdir(parents=True, exist_ok=True)
 errors, results = [], []
 
 def assert_fits(page):
-    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Horizontal overflow'
+    if not page.evaluate('document.documentElement.scrollWidth <= innerWidth'):
+        page.screenshot(path=str(OUT/'overflow.png'),full_page=True)
+        print(page.evaluate('''()=>[...document.querySelectorAll('body *')].filter(e=>{
+            const r=e.getBoundingClientRect();return r.width&&r.right>innerWidth+1;
+            }).map(e=>({tag:e.tagName,cls:e.className,text:e.textContent.slice(0,60),rect:e.getBoundingClientRect().toJSON()})).slice(0,20)'''),flush=True)
+        raise AssertionError('Horizontal overflow')
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, executable_path=os.environ.get('CHROMIUM_PATH'))
@@ -94,11 +99,13 @@ with sync_playwright() as p:
         expect(page.locator('[data-action=game-menu]')).to_have_attribute('aria-expanded', 'true')
         page.keyboard.press('Escape')
         assert not page.locator('.game-menu').is_visible()
-        page.locator('[data-action=next-choice]').click()
+        next_stop(page)
         assert page.locator('#modal').bounding_box()['width'] <= 561
         page.locator('[aria-label="收起当前抉择"]').click()
-        assert page.locator('.age-display strong').inner_text() == '6'
+        assert page.locator('.age-display strong').inner_text() == '2'
         page.locator('[data-action=decision]').click()
+        page.locator('[data-choice="0"]').click()
+        next_stop(page)
         page.locator('[data-choice="0"]').click()
         page.locator('[data-focus=health]').click()
         assert page.locator('[data-focus=health]').get_attribute('aria-pressed') == 'true'
@@ -110,9 +117,9 @@ with sync_playwright() as p:
         assert page.locator('body').evaluate('(x)=>x.classList.contains("dark")')
         assert_fits(page)
         if width == 1920:
-            page.locator('[data-action=next-choice]').click()
+            next_stop(page)
             page.locator('[data-action=choice-auto]').click()
-            assert not page.locator('#modal').is_visible()
+            expect(page.locator('#modal')).not_to_be_visible(timeout=6000)
             assert page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).current.auto") is True
         if width == 390:
             page.screenshot(path=str(OUT/'mobile-menu-dark.png'))
@@ -120,13 +127,15 @@ with sync_playwright() as p:
             for _ in range(120):
                 if page.locator('#ending-view').is_visible(): break
                 if page.locator('[data-choice]').first.is_visible(): page.locator('[data-choice="1"]').click()
-                else: page.locator('[data-action=next-choice]').click()
+                else: next_stop(page)
             assert page.locator('#ending-view').is_visible()
             page.screenshot(path=str(OUT/'ending-mobile.png'))
             finish_ending(page)
             expect(page.locator('#memory-note')).to_be_visible()
             page.locator('[data-action=replay-ending]').click()
             expect(page.locator('#ending-view')).to_be_visible()
+            page.locator('.ending-skip').click()
+            assert page.locator('#ending-view').is_visible()
             page.locator('.ending-skip').click()
             expect(page.locator('#memory-note')).to_be_visible()
             assert page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).history.length") == 1

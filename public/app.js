@@ -6,6 +6,7 @@ import {
   choose,
   decisions,
   validateLife,
+  pendingDecision,
 } from "./engine.js";
 import {
   configureEras,
@@ -25,8 +26,9 @@ import {
   gameMarkup,
   miniMap,
   registrationMarkup,
-  endingMarkup,
 } from "./presentation.js";
+import { deathRecordMarkup, endingMarkup, endingFrames, endingFrameMarkup } from "./life-record.js";
+import { AUTO_READING_MS, yearInterval, autoChoiceIndex, focusOptions } from "./playback.js";
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -72,6 +74,12 @@ let lastTick = performance.now(),
   musicOn = false;
 const expandedEvents = new Set();
 const collapsedPanels = new Set();
+let fastForward = false,
+  autoPreview = null,
+  suppressedDecision = null;
+let endingPlayback = null;
+let chosenDialogClose = false;
+const decisionKey = () => current ? [current.id,current.age,current.pending,current.deep?.experience?.activeEvent?.id||""].join(":") : "";
 try {
   const stored = JSON.parse(localStorage.getItem(PREF) || "{}");
   preferences =
@@ -162,25 +170,35 @@ function archive(s) {
   renderArchives();
 }
 function modal(kicker, html) {
+  $(".modal-heading .choice-tag")?.remove();
   $("#modal-kicker").textContent = kicker;
   $("#modal-content").innerHTML = html;
   const choice = Boolean($("#modal-content .choices"));
   $("#modal").classList.toggle("choice-dialog", choice);
   const dismiss = $(".modal-heading [data-action=close]");
+  const context = $("#modal-content .choice-tag");
+  if (choice && context) dismiss.before(context);
   dismiss.textContent = choice ? "先收起来 ▾" : "×";
   dismiss.setAttribute("aria-label", choice ? "收起当前抉择" : "关闭对话框");
   if (!$("#modal").open) $("#modal").showModal();
 }
-function closeModal() {
+function closeModal(chosen = false) {
+  if (!chosen && current?.pending && $("#modal-content .choices")) suppressedDecision = decisionKey();
+  autoPreview = null;
+  chosenDialogClose = chosen && $("#modal").open;
   $("#modal").close();
   lastTick = performance.now();
 }
 function showHome() {
   running = false;
+  fastForward = false;
+  autoPreview = null;
   view = "home";
   document.body.dataset.view = view;
   $("#registration-view").classList.add("hidden");
   $("#ending-view").classList.add("hidden");
+  $("#record-view").classList.add("hidden");
+  $("#record-view").replaceChildren();
   $("#home-view").classList.remove("hidden");
   $("#game-view").classList.add("hidden");
   $("#resume-button").classList.toggle(
@@ -195,6 +213,8 @@ function showGame() {
   document.body.dataset.view = view;
   $("#registration-view").classList.add("hidden");
   $("#ending-view").classList.add("hidden");
+  $("#record-view").classList.add("hidden");
+  $("#record-view").replaceChildren();
   $("#home-view").classList.add("hidden");
   $("#game-view").classList.remove("hidden");
   lastTick = performance.now();
@@ -328,6 +348,8 @@ function showRegistration() {
   $("#home-view").classList.add("hidden");
   $("#game-view").classList.add("hidden");
   $("#ending-view").classList.add("hidden");
+  $("#record-view").classList.add("hidden");
+  $("#record-view").replaceChildren();
   $("#registration-view").classList.remove("hidden");
   const s = current;
   const probability = weights(s.mode, {
@@ -354,6 +376,7 @@ function renderGame() {
     timelineLimit,
     musicOn,
     expandedEvents,
+    fastForward,
   });
   if (innerWidth <= 1250) $(".game-menu").append($(".game-extra-controls"));
   document.querySelectorAll(".identity-card,.profile-card,.game-insights .insight-card").forEach((panel, index) => {
@@ -381,12 +404,20 @@ function showEnding(s) {
   view = "ending";
   document.body.dataset.view = view;
   closeModal();
-  for (const id of ["home-view", "game-view", "registration-view"])
+  for (const id of ["home-view", "game-view", "registration-view", "record-view"])
     $("#" + id).classList.add("hidden");
+  $("#record-view").replaceChildren();
   $("#ending-view").innerHTML = endingMarkup(s, countries);
   $("#ending-view").classList.remove("hidden");
+  endingPlayback = {life:s,frames:endingFrames(s,countries),index:0,elapsed:0,armed:false};
+  $("#ending-stage").innerHTML = endingFrameMarkup(endingPlayback.frames[0],s,countries);
   window.scrollTo({ top: 0, behavior: "instant" });
-  $("#ending-view [data-action=ending-record]").focus();
+  $("#ending-view .ending-skip").focus();
+}
+function revealEnding() {
+  endingPlayback.index = endingPlayback.frames.length-1;
+  $("#ending-stage").classList.add("hidden");
+  $(".ending-final").classList.remove("hidden");
 }
 function performStep() {
   if (!current || current.stage !== "living") return;
@@ -396,7 +427,9 @@ function performStep() {
     else showDecision();
     return;
   }
+  const lastEvent = current.events.at(-1)?.id;
   step(current, countries);
+  if (current.pending || initSystems(current).reflection !== null || current.stage === "ended") fastForward = false;
   save();
   renderGame();
   if (current.stage === "ended") {
@@ -407,31 +440,34 @@ function performStep() {
   else if (current.pending) {
     if (current.auto) autoChoose();
     else showDecision();
+  } else if (fastForward && current.events.some(e=>e.id>lastEvent && /告别|离世|毕业|出生/.test(e.title))) {
+    fastForward = false;
+    running = false;
+    renderGame();
   }
 }
-function showDecision() {
+function showDecision(automatic = false) {
   if (!current?.pending) return;
-  const d =
-    current.pending === "scene"
-      ? specialDecision(current)
-      : decisions.find((d) => d.age === current.pending);
+  const d = pendingDecision(current,countries);
   if (!d) return;
   modal(
     "重大抉择",
-    `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p><div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><b>${esc(c.title)} <span>↗</span></b><small>${esc(c.hint)}</small></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。选择会改变状态、关系与经济状况，结果也受环境和运气影响。收起窗口后，时间会停在这里等你。</p>`,
+    `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p>${d.age===2?'<aside class="choice-context-note">人格差异与遗传和环境都有关。2015 年一项综合研究的平均遗传率估计约为 40%。<a href="https://pubmed.ncbi.nlm.nih.gov/25961374/" target="_blank" rel="noopener">Vukasović 与 Bratko</a></aside>':''}<div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><span class="choice-number">${i+1}</span><span><b>${esc(c.title)}</b><small>${esc(c.hint)}</small></span></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。收起窗口后，时间会停在这里等你。</p>`,
   );
+  if (automatic) {
+    suppressedDecision = null;
+    const pick = autoChoiceIndex(current,d,()=>random(current));
+    autoPreview = { token:decisionKey(), pick, remaining:AUTO_READING_MS };
+    const selected = $("[data-choice='"+pick+"']");
+    selected.classList.add("auto-preview");
+    selected.setAttribute("aria-label",d.choices[pick].title+"，自动预选，点击可接管");
+    $(".choice-auto").innerHTML = `<p class="auto-status" role="status">稍后将选择「${esc(d.choices[pick].title)}」<br><small>点击选项可接管这次抉择。</small></p><button class="small-button" data-action="auto-stop">关闭自动抉择</button>`;
+  }
 }
 function autoChoose() {
   if (!current?.pending) return;
-  let pick =
-    current.focus === "study"
-      ? 0
-      : current.focus === "connection"
-        ? 1
-        : Math.floor(random(current) * 3);
-  choose(current, pick, countries);
-  save();
-  renderGame();
+  if (suppressedDecision === decisionKey()) return;
+  if (!autoPreview) showDecision(true);
 }
 function statistics() {
   modal(
@@ -459,6 +495,19 @@ function showHistory() {
 }
 function showMemory(s) {
   memoryId = s.id;
+  if (s.stage === "ended") {
+    running = false;
+    closeModal();
+    view = "record";
+    document.body.dataset.view = view;
+    endingPlayback = null;
+    for (const id of ["home-view","game-view","registration-view","ending-view"]) $("#"+id).classList.add("hidden");
+    $("#record-view").innerHTML = deathRecordMarkup(s,countries);
+    $("#record-view").classList.remove("hidden");
+    window.scrollTo({top:0,behavior:"instant"});
+    $("#record-view [data-action=home]").focus({preventScroll:true});
+    return;
+  }
   const c = country(s.country),
     ended = s.stage === "ended",
     notable = s.events.filter((e) => e.star || e.type === "decision").slice(-5);
@@ -642,7 +691,7 @@ async function downloadCard() {
 function about() {
   modal(
     "ABOUT THIS EXPERIMENT / 关于这个实验",
-    `<h2 class="modal-title">看见别人，也重新看见自己。</h2><div class="about-text"><p>这个独立实现的人生模拟，玩法灵感来自 <a href="https://1in8b.life/en/" target="_blank" rel="noopener">1 in 8 Billion</a>。没有复制原站源代码、美术、文字或玩家内容，也不与原站的纪念馆、账户或付费系统互通。</p><h3>哪些来自统计？</h3><p>出生地使用世界银行 WDI 2023 年人口与粗出生率加权抽取，覆盖 ${countries.length} 个有完整人口、出生率和寿命数据的国家和地区。预期寿命与人均 GDP（PPP）同样来自 WDI。人口合计约 ${(countries.reduce((a, c) => a + c.population, 0) / 1e8).toFixed(1)} 亿，估计年出生人数约 ${(countries.reduce((a, c) => a + (c.population * c.birthRate) / 1000, 0) / 1e8).toFixed(2)} 亿。还可以选择 1970、1990、2010 年历史截面；2050 年为明确标注的游戏假设，不是人口预测。每一局始终沿用开局选定的统计环境。</p><h3>哪些是游戏？</h3><p>姓名、性别抽签、家庭条件、城市或乡村、职业、收入、关系、选择与事件均是虚构规则。寿命以当地均值和简化随机分布生成，不使用真实生命表；不模拟婴儿死亡、战争、暴力或自伤。收入以人均 GDP 为游戏基数，缺失时使用收入组估计，不能视作当地实际工资。温柔模式减少普通疾病事件。页面的告别计数使用约每秒 2 人的演示值。</p><h3>你的故事，留在你这里</h3><p>完整进度、人生停顿和本地档案只存于浏览器。你可以自愿预览并公开一段已结束的虚构人生摘要；公开纪念、烛光与留言保存在本站服务器，可凭本机管理凭证撤回。没有账户和第三方分析。分享起点链接包含随机种子、抽样方式与世界设置；下载的卡片保存在你的设备。更换设备前请在「我的人生」导出档案。</p><p>数据：<a href="https://data.worldbank.org" target="_blank" rel="noopener">世界银行 WDI（CC BY 4.0）</a>，地图：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth（公共领域）</a>。<a href="https://github.com/fengbule/birth" target="_blank" rel="noopener">源代码与部署说明 ↗</a></p></div>`,
+    `<h2 class="modal-title">看见别人，也重新看见自己。</h2><div class="about-text"><p>这个独立实现的人生模拟，玩法灵感来自 <a href="https://1in8b.life/en/" target="_blank" rel="noopener">1 in 8 Billion</a>。没有复制原站源代码、美术、文字或玩家内容，也不与原站的纪念馆、账户或付费系统互通。</p><h3>哪些来自统计？</h3><p>出生地使用世界银行 WDI 2023 年人口与粗出生率加权抽取，覆盖 ${countries.length} 个有完整人口、出生率和寿命数据的国家和地区。预期寿命与人均 GDP（PPP）同样来自 WDI。人口合计约 ${(countries.reduce((a, c) => a + c.population, 0) / 1e8).toFixed(1)} 亿，估计年出生人数约 ${(countries.reduce((a, c) => a + (c.population * c.birthRate) / 1000, 0) / 1e8).toFixed(2)} 亿。还可以选择 1970、1990、2010 年历史截面；2050 年为明确标注的游戏假设，不是人口预测。每一局始终沿用开局选定的统计环境。</p><h3>哪些是游戏？</h3><p>姓名、性别抽签、家庭条件、城市或乡村、职业、收入、关系、选择与事件均是虚构规则。寿命使用 WDI 婴儿、五岁前、成年死亡概率和男女预期寿命作锚点，以分年龄曲线插值；可以遇到婴幼儿、未成年或高龄结局。缺失锚点用地区中位数估计，5至14岁风险仍为模型假设，未复用原站生命表。死因为虚构叙事，未按 WHO 死因比例校准。收入以人均 GDP 为游戏基数，缺失时使用收入组估计，不能视作当地实际工资。温柔模式减少普通疾病事件。页面的告别计数使用约每秒 2 人的演示值。</p><h3>你的故事，留在你这里</h3><p>完整进度、人生停顿和本地档案只存于浏览器。你可以自愿预览并公开一段已结束的虚构人生摘要；公开纪念、烛光与留言保存在本站服务器，可凭本机管理凭证撤回。没有账户和第三方分析。分享起点链接包含随机种子、抽样方式与世界设置；下载的卡片保存在你的设备。更换设备前请在「我的人生」导出档案。</p><p>数据：<a href="https://data.worldbank.org" target="_blank" rel="noopener">世界银行 WDI（CC BY 4.0）</a>，地图：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth（公共领域）</a>。<a href="https://github.com/fengbule/birth" target="_blank" rel="noopener">源代码与部署说明 ↗</a></p></div>`,
   );
 }
 function confirmNew() {
@@ -699,6 +748,7 @@ document.addEventListener("click", async (e) => {
   }
   if (target.dataset.focus) {
     current.focus = target.dataset.focus;
+    initSystems(current).autoFocus = false;
     save();
     renderGame();
     return;
@@ -719,17 +769,20 @@ document.addEventListener("click", async (e) => {
   }
   if (target.dataset.speed) {
     speed = Number(target.dataset.speed);
+    running = true;
+    fastForward = false;
     elapsed = 0;
     renderGame();
     return;
   }
   if (target.dataset.choice !== undefined) {
     if (choose(current, Number(target.dataset.choice), countries)) {
-      closeModal();
+      closeModal(true);
       save();
       renderGame();
       lastTick = performance.now();
       elapsed = 0;
+      if (current.pending) setTimeout(()=>current.auto?autoChoose():showDecision(),0);
     }
     return;
   }
@@ -742,6 +795,7 @@ document.addEventListener("click", async (e) => {
       save();
       if (current.stage === "ended") archive(current);
       renderGame();
+      $("[data-star='"+target.dataset.star+"']")?.focus({preventScroll:true});
     }
     return;
   }
@@ -791,9 +845,19 @@ document.addEventListener("click", async (e) => {
     case "choice-auto":
       current.auto = true;
       running = true;
-      closeModal();
+      initSystems(current).autoFocus = true;
+      suppressedDecision = null;
+      renderGame();
       autoChoose();
+      save();
       lastTick = performance.now();
+      break;
+    case "auto-stop":
+      current.auto = false;
+      autoPreview = null;
+      save();
+      renderGame();
+      showDecision();
       break;
     case "game-menu": {
       const menu = $(".game-menu");
@@ -802,6 +866,7 @@ document.addEventListener("click", async (e) => {
       break;
     }
     case "reflection-toggle": {
+      if (current.auto) break;
       const d = initSystems(current);
       d.reflectionsEnabled = !d.reflectionsEnabled;
       if (!d.reflectionsEnabled && d.reflection !== null) remember(current, "");
@@ -815,9 +880,16 @@ document.addEventListener("click", async (e) => {
       renderGame();
       break;
     case "ending-record":
-      if (endingOrigin === "home") showHome();
-      else showGame();
       showMemory(endingLife);
+      break;
+    case "ending-skip":
+      if (endingPlayback?.armed) showMemory(endingLife);
+      else if (endingPlayback) {
+        endingPlayback.armed = true;
+        revealEnding();
+        target.textContent = "再点一下就会关闭";
+        target.setAttribute("aria-label","再点一下就会关闭");
+      }
       break;
     case "replay-ending": {
       const life = selectedMemory();
@@ -885,6 +957,7 @@ document.addEventListener("click", async (e) => {
       break;
     case "pause":
       running = !running;
+      fastForward = false;
       elapsed = 0;
       lastTick = performance.now();
       renderGame();
@@ -895,25 +968,19 @@ document.addEventListener("click", async (e) => {
       performStep();
       break;
     case "next-choice":
-      running = false;
-      for (
-        let i = 0;
-        i < 111 &&
-        current.stage === "living" &&
-        !current.pending &&
-        initSystems(current).reflection === null;
-        i++
-      )
-        step(current, countries);
-      save();
+      fastForward = !fastForward;
+      running = fastForward;
+      elapsed = 0;
+      lastTick = performance.now();
       renderGame();
-      if (current.stage === "ended") {
-        archive(current);
-        showEnding(current);
-      } else if (!pauseForReflection()) showDecision();
       break;
     case "auto":
       current.auto = !current.auto;
+      if (current.auto) {
+        running = true;
+        initSystems(current).autoFocus = true;
+        suppressedDecision = null;
+      }
       save();
       if (current.auto && current.pending) autoChoose();
       renderGame();
@@ -958,6 +1025,7 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("change", (e) => {
   if (e.target.id === "focus-select" && current) {
     current.focus = e.target.value;
+    initSystems(current).autoFocus = false;
     save();
     renderGame();
     toast("接下来的一年，会多留一点心思在这里。");
@@ -1002,7 +1070,17 @@ $("#modal").addEventListener("click", (e) => {
   }
 });
 $("#modal").addEventListener("close", () => {
+  if (!chosenDialogClose && current?.pending) suppressedDecision = decisionKey();
+  chosenDialogClose = false;
+  autoPreview = null;
   lastTick = performance.now();
+});
+$("#modal-content").addEventListener("click", e => {
+  if (!autoPreview || e.target.closest("button,a,input,textarea,select")) return;
+  suppressedDecision = decisionKey();
+  autoPreview = null;
+  $(".auto-preview")?.classList.remove("auto-preview");
+  $(".auto-status").textContent = "这次抉择留给你。之后仍会自动选择。";
 });
 document.addEventListener("visibilitychange", () => {
   lastTick = performance.now();
@@ -1017,6 +1095,37 @@ setInterval(() => {
   const now = performance.now(),
     delta = Math.min(1000, now - lastTick);
   lastTick = now;
+  if (view === "ending" && endingPlayback && !document.hidden) {
+    const playback = endingPlayback, frame = playback.frames[playback.index];
+    if (frame.kind !== "final") {
+      playback.elapsed += delta;
+      if (playback.elapsed >= frame.duration) {
+        playback.elapsed = 0;
+        playback.index++;
+        const next = playback.frames[playback.index];
+        if (next.kind === "final") revealEnding();
+        else $("#ending-stage").innerHTML = endingFrameMarkup(next,playback.life,countries);
+      }
+    }
+    return;
+  }
+  if (autoPreview) {
+    if (!current || autoPreview.token !== decisionKey() || !current.auto) autoPreview = null;
+    else if (running && view === "game" && !document.hidden && $("#modal").open) {
+      autoPreview.remaining -= delta;
+      if (autoPreview.remaining <= 0) {
+        const pick = autoPreview.pick;
+        autoPreview = null;
+        choose(current,pick,countries);
+        closeModal(true);
+        save();
+        renderGame();
+        elapsed = 0;
+        if (current.pending) setTimeout(()=>autoChoose(),0);
+      }
+      return;
+    }
+  }
   if (
     !running ||
     view !== "game" ||
@@ -1035,13 +1144,19 @@ setInterval(() => {
     return;
   }
   elapsed += delta;
-  const interval =
-    (current.duration * 60000) / livingCountry(current, countries).life / speed;
+  const interval = fastForward
+    ? Math.min(1000,yearInterval(current.duration,livingCountry(current,countries).life,24))
+    : yearInterval(current.duration,livingCountry(current,countries).life,speed);
+  $(".game-heading > p")?.style.setProperty("--year-progress",`${Math.min(100,elapsed/interval*100)}%`);
   if (elapsed >= interval) {
     elapsed = 0;
+    if (current.auto && initSystems(current).autoFocus !== false && current.age >= 6) {
+      const choices = focusOptions(current);
+      current.focus = choices[Math.floor(random(current)*choices.length)][0];
+    }
     performStep();
   }
-}, 160);
+}, 50);
 let land = [],
   mapWidth = 0,
   mapHeight = 0;

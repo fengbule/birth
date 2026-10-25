@@ -1,6 +1,11 @@
 """Operate the same visible controls that desktop and compact layouts expose."""
 
 def click_action(page, action):
+    if page.locator('body').get_attribute('data-view') == 'home' and action in ['exit','home']:
+        return
+    if page.locator('body').get_attribute('data-view') == 'record' and action in ['history','exit','home']:
+        page.locator('#record-view [data-action=home]').click()
+        if action in ['exit','home']:return
     selector = '[data-action="'+action+'"]'
     visible = page.locator(selector+':visible')
     if visible.count():
@@ -13,11 +18,25 @@ def click_action(page, action):
 
 def click_tool(page, tool):
     selector = '[data-deep="'+tool+'"]'
-    if not page.locator(selector).is_visible():
+    if not page.locator(selector+':visible').count():
         if not page.locator('.game-menu').is_visible():
             page.locator('[data-action=game-menu]').click()
-    page.locator(selector).click()
+    page.locator(selector+':visible').first.click()
 
 def finish_ending(page):
     if page.locator('#ending-view').is_visible():
-        page.locator('#ending-view [data-action=ending-record]').last.click()
+        page.locator('#ending-view [data-action=ending-skip]').click()
+        page.locator('#ending-view [data-action=ending-skip]').click()
+
+
+def next_stop(page):
+    """Fast-forward through visible years; stop at a decision, reflection or end."""
+    for _ in range(15):
+        if page.locator('#modal[open]').is_visible() or page.locator('#ending-view').is_visible():
+            return
+        page.locator('[data-action=next-choice]').click()
+        page.wait_for_function('''()=>document.querySelector('#modal').open ||
+            !document.querySelector('#ending-view').classList.contains('hidden') ||
+            document.querySelector('[data-action="next-choice"]').getAttribute('aria-pressed')==='false' ''',timeout=45000)
+        if page.locator('#modal[open]').is_visible() or page.locator('#ending-view').is_visible():return
+    raise AssertionError('Could not reach a stop through visible fast-forward controls')

@@ -12,6 +12,7 @@ import {
   reflectionQuestions,
 } from "./systems.js";
 import { readOwners as ownerTokens } from "./ownership.js";
+import { consumptionOptions, consume } from "./life-events.js";
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -78,9 +79,12 @@ function finance() {
   const s = app.getCurrent(),
     d = initSystems(s),
     a = d.assets;
+  const items=consumptionOptions(s,app.getCountries());
+  const tile=item=>`<button class="consumption-button" data-consume="${item.id}" ${item.disabled?'disabled':''}><span><b>${esc(item.title)}</b><small>${esc(item.description)}</small></span><span><strong>${item.cost?money(item.cost):'免费'}</strong>${item.reason?`<small>${esc(item.reason)}</small>`:''}</span></button>`;
+  const available=items.filter(i=>!i.remaining),used=items.filter(i=>i.remaining);
   app.modal(
     "SPEND & INVEST / 消费与投资",
-    `<h2 class="modal-title">让生活，有一点余地。</h2><div class="balance-grid"><div><span>可用现金</span><strong>${money(s.money)}</strong></div><div><span>净资产</span><strong>${money(netWorth(s))}</strong></div><div><span>本年收入</span><strong>${money(d.annual.income)}</strong></div><div><span>生活与专项开销</span><strong>${money(d.annual.expenses)}</strong></div></div><div class="asset-lines"><p><span>稳健组合</span><b>${money(a.bonds)}</b></p><p><span>波动组合</span><b>${money(a.stocks)}</b></p><p><span>房产 / 房贷</span><b>${money(a.house)} / ${money(a.mortgage)}</b></p><p><span>本年模拟市场回报</span><b>${(d.lastMarket * 100).toFixed(1)}%</b></p></div><h3 class="panel-subtitle">重新安排手中的储备</h3><div class="trade-form"><select id="trade-type" aria-label="财务操作"><option value="bonds">配置稳健组合</option><option value="stocks">配置波动组合</option><option value="sell-bonds">赎回稳健组合</option><option value="sell-stocks">赎回波动组合</option><option value="repay">提前偿还房贷</option></select><input type="number" id="trade-amount" min="1" max="1000000000" value="${Math.max(1, Math.round(Math.max(0, s.money) * 0.1))}" aria-label="金额"><button class="small-button" data-deep="trade" ${s.age < 18 || s.stage !== "living" ? "disabled" : ""}>确认</button></div><p class="history-note">稳健组合每年模拟增长 2.5%；波动组合每年随机变化，可能亏损。现金有原模型存款收益，负现金会产生债务成本。所有金额与回报均为游戏参数。</p><h3 class="panel-subtitle">花一些时间，也花一些心思</h3>${actionButtons(["exercise", "learn", "checkup", "travel", "insurance"])}<p class="decision-footnote">主动活动：${d.annual.actions.length} / 3。本页面的投资与医疗只是虚构游戏规则。</p>`,
+    `<h2 class="modal-title">花钱 · 投资</h2><div class="balance-grid"><div><span>${s.money<0?'负债':'积蓄'}</span><strong>${money(Math.abs(s.money))}</strong></div><div><span>净资产</span><strong>${money(netWorth(s))}</strong></div></div><div class="consumption-list">${available.slice(0,5).map(tile).join('')}</div><details class="shop-more"><summary>更多项目 · ${Math.max(0,available.length-5)+used.length}</summary><div class="consumption-list">${available.slice(5).concat(used).map(tile).join('')}</div></details>${!items.length?'<p>长大后，可以在这里安排生活的支出。</p>':''}<details class="portfolio-more"><summary>投资与财务明细</summary><div class="asset-lines"><p><span>稳健组合</span><b>${money(a.bonds)}</b></p><p><span>波动组合</span><b>${money(a.stocks)}</b></p><p><span>房产 / 房贷</span><b>${money(a.house)} / ${money(a.mortgage)}</b></p><p><span>本年收入 / 专项开销</span><b>${money(d.annual.income)} / ${money(d.annual.expenses)}</b></p></div><div class="trade-form"><select id="trade-type" aria-label="财务操作"><option value="bonds">配置稳健组合</option><option value="stocks">配置波动组合</option><option value="sell-bonds">赎回稳健组合</option><option value="sell-stocks">赎回波动组合</option><option value="repay">提前偿还房贷</option></select><input type="number" id="trade-amount" min="1" max="1000000000" value="${Math.max(1, Math.round(Math.max(0, s.money) * 0.1))}" aria-label="金额"><button class="small-button" data-deep="trade" ${s.age < 18 || s.stage !== "living" ? "disabled" : ""}>确认</button></div></details><details><summary>其他年度活动</summary>${actionButtons(["exercise", "learn", "checkup", "travel", "insurance"])}</details>`,
   );
 }
 function career() {
@@ -217,6 +221,14 @@ async function handle(e) {
   if (!button) return;
   const s = app.getCurrent();
   try {
+    if (button.dataset.consume) {
+      const openMore=Boolean($(".shop-more")?.open);
+      const result=consume(s,button.dataset.consume,app.getCountries());
+      app.save();app.render();finance();
+      if(openMore)$(".shop-more").open=true;
+      app.toast(result.message);
+      return;
+    }
     if (button.dataset.publicMemory) {
       await openPublicMemory(button.dataset.publicMemory);
       return;

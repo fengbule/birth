@@ -1,4 +1,4 @@
-from browser_helpers import click_action, click_tool, finish_ending
+from browser_helpers import click_action, click_tool, finish_ending, next_stop
 from playwright.sync_api import sync_playwright
 from pathlib import Path
 import json,os
@@ -23,15 +23,17 @@ with sync_playwright() as p:
     page.screenshot(path=str(out/'birth-desktop.png'))
     page.locator('[data-action=begin-life]').click()
     page.locator('[data-action=pause]').click()
-    page.locator('[data-action=next-choice]').click()
-    assert page.locator('.choice-tag').inner_text().startswith('6 岁')
+    next_stop(page)
+    assert page.locator('.choice-tag').inner_text().startswith('2 岁')
     page.screenshot(path=str(out/'decision-desktop.png'))
+    page.locator('[data-choice="0"]').click()
+    next_stop(page)
     page.locator('[data-choice="0"]').click()
     page.locator('#focus-select').select_option('health')
     page.reload(wait_until='networkidle')
     assert page.locator('#resume-button').is_visible()
     page.locator('#resume-button').click()
-    assert '6' in page.locator('.age-display').inner_text()
+    assert '7' in page.locator('.age-display').inner_text()
     assert page.locator('#focus-select').input_value()=='health'
     page.locator('[data-action=pause]').click()
     page.screenshot(path=str(out/'game-desktop.png'),full_page=True)
@@ -42,7 +44,7 @@ with sync_playwright() as p:
         elif page.locator('#modal').is_visible():
             page.locator('[data-choice="0"]').click()
         else:
-            page.locator('[data-action=next-choice]').click()
+            next_stop(page)
         loops+=1
     assert page.locator('#memory-note').is_visible()
     page.locator('#memory-note').fill('换一个起点，仍然认真生活。')
@@ -51,7 +53,6 @@ with sync_playwright() as p:
     with page.expect_download() as download:
         page.locator('[data-action=download-card]').click()
     download.value.save_as(str(out/'life-card.png'))
-    page.locator('[data-action=close]').click()
     click_action(page, 'history')
     with page.expect_download() as download:
         page.locator('[data-action=export]').click()
@@ -112,7 +113,7 @@ with sync_playwright() as p:
     page.locator('[data-action=confirm-birth]').click()
     page.locator('[data-action=begin-life]').click()
     page.locator('[data-action=pause]').click()
-    page.locator('[data-action=next-choice]').click()
+    next_stop(page)
     page.keyboard.press('Escape')
     assert page.locator('.pending-banner').is_visible()
     age=page.locator('.age-display strong').inner_text()

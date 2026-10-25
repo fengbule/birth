@@ -104,7 +104,10 @@ test("migration changes residence, preserves birthplace, charges once per year",
 test("reflection freezes the year until explicitly answered or skipped", () => {
   const s = createLife(countries, { seed: 9, reflections: true });
   s.stage = "living";
-  for (let i = 0; i < 5; i++) step(s, countries);
+  while (s.age < 5) {
+    if (s.pending) choose(s,0,countries);
+    else step(s,countries);
+  }
   assert.equal(s.deep.reflection, 5);
   step(s, countries);
   assert.equal(s.age, 5);

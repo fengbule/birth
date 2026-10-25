@@ -10,6 +10,7 @@ import {
   weightedCountry,
   random,
   annualIncome,
+  pendingDecision,
 } from "../public/engine.js";
 const { countries } = JSON.parse(
   await readFile(new URL("../public/data/countries.json", import.meta.url)),
@@ -51,16 +52,16 @@ test("birth and population sampling use their respective weights", () => {
 test("a pending decision freezes time, each decision can resolve only once", () => {
   const s = createLife(countries, { seed: 22 });
   s.stage = "living";
-  while (s.age < 6) step(s, countries);
-  assert.equal(s.pending, 6);
+  while (!s.pending) step(s, countries);
+  assert.equal(s.pending, 2);
   const rng = s.rng;
   step(s, countries);
-  assert.equal(s.age, 6);
+  assert.equal(s.age, 2);
   assert.equal(s.rng, rng);
   assert.equal(choose(s, 0, countries), true);
   assert.equal(choose(s, 0, countries), false);
   step(s, countries);
-  assert.equal(s.age, 7);
+  assert.equal(s.age, 3);
 });
 test("1000 complete lives preserve invariants and terminate without deadlocks", () => {
   for (let seed = 1; seed <= 1000; seed++) {
@@ -68,7 +69,7 @@ test("1000 complete lives preserve invariants and terminate without deadlocks", 
     s.stage = "living";
     let loops = 0;
     while (s.stage === "living" && loops++ < 150) {
-      if (s.pending) choose(s, Math.floor(random(s) * 3), countries);
+      if (s.pending) choose(s, Math.floor(random(s) * pendingDecision(s,countries).choices.length), countries);
       else step(s, countries);
       assert.ok(
         validateLife(s, countries),
@@ -76,7 +77,7 @@ test("1000 complete lives preserve invariants and terminate without deadlocks", 
       );
     }
     assert.equal(s.stage, "ended");
-    assert.ok(s.age >= 30 && s.age <= 110);
+    assert.ok(s.age >= 0 && s.age <= 110);
     assert.equal(s.events.at(-1).type, "end");
     assert.equal(s.pending, null);
     const copy = structuredClone(s);
@@ -122,9 +123,9 @@ test("spending, education, and retirement change the economic model", () => {
   assert.ok(s.money < 1e7);
   assert.equal(s.housing, "按揭中的家");
 });
-test("each milestone has three resolvable options", () => {
+test("each milestone resolves every offered option exactly once", () => {
   for (const d of decisions)
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < d.choices.length; i++) {
       const s = createLife(countries, { seed: 99 });
       s.stage = "living";
       s.age = d.age;

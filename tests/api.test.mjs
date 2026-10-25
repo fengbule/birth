@@ -98,6 +98,15 @@ test("public memorial lifecycle persists and enforces ownership and candle uniqu
       (await fetch(base + "/api/memorials").then((r) => r.json())).total,
       0,
     );
+    r = await post('/api/memorials', {
+      ...fixture, age: 0, moments: [{age: 0, title: '来到世上的一天'}],
+    });
+    assert.equal(r.status, 201);
+    const infant = await r.json();
+    assert.equal((await fetch(base + '/api/memorials/' + infant.id).then(r=>r.json())).age, 0);
+    assert.equal((await fetch(base + '/api/memorials/' + infant.id, {
+      method: 'DELETE', headers: {Authorization: 'Bearer ' + infant.ownerToken},
+    })).status, 200);
   } finally {
     await new Promise((r) => app.close(r));
     await rm(dir, { recursive: true, force: true });

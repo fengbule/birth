@@ -1,5 +1,6 @@
 // Independent game systems. All probabilities and prices here are game rules.
 import { appendRecord } from "./records.js";
+import { validExperience, recordYear } from "./experience.js";
 const clamp = (n, min = 0, max = 100) => Math.min(max, Math.max(min, n));
 function rng(s) {
   let t = (s.rng += 0x6d2b79f5);
@@ -930,5 +931,7 @@ export function validateSystems(s, countries) {
     !d.visited.every((id) => countries.some((c) => c.id === id))
   )
     return false;
+  if (!validExperience(d.experience, s, countries)) return false;
+  if (d.autoFocus !== undefined && typeof d.autoFocus !== "boolean") return false;
   return true;
 }
