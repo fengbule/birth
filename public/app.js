@@ -7,6 +7,7 @@ import {
   decisions,
   validateLife,
   pendingDecision,
+  referenceCountryIds,
 } from "./engine.js";
 import {
   configureEras,
@@ -23,14 +24,14 @@ import {
 } from "./deep-ui.js";
 import { readOwners, validOwners, mergeOwners } from "./ownership.js";
 import {
+  gameMarkup,
   miniMap,
   registrationMarkup,
 } from "./presentation.js";
 import { deathRecordMarkup, endingMarkup, endingFrames, endingFrameMarkup } from "./life-record.js";
 import { AUTO_READING_MS, yearInterval, autoChoiceIndex, focusOptions } from "./playback.js";
-import { gameMarkup } from './town-ui.js';
-import { TownScene } from './town-scene.js';
-import { placeById, routinePlace, townActivities, performTownActivity } from './town-activities.js';
+import { clockFor, advanceClock, decisionReady } from './timeline-clock.js';
+import { referenceCountry, withReferenceCountries } from './reference-data.js';
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -75,68 +76,13 @@ let lastTick = performance.now(),
   musicNodes = [],
   musicOn = false;
 const expandedEvents = new Set();
+const collapsedPanels = new Set();
 let fastForward = false,
   autoPreview = null,
   suppressedDecision = null;
 let endingPlayback = null;
 let chosenDialogClose = false;
-const decisionKey = () => current ? [current.id,current.age,current.pending,current.deep?.experience?.activeEvent?.id||""].join(":") : "";
-let townTask=null, selectedPlace=null, storyQueue=[], storyIndex=0,
-  storyContinuation=null, storyElapsed=0, currentMoment=null;
-const townScene=new TownScene({onPhase:phase=>{
-  if(!townTask)return;
-  townTask.phase=phase;
-  const label=$('#town-current-action');
-  if(label)label.textContent=phase==='walking'?'正在前往'+placeById(townTask.place).name:townTask.label;
-  $('.moment-process')?.classList.toggle('has-arrived',phase==='acting');
-}});
-const statSnapshot=()=>Object.fromEntries(['health','happiness','knowledge','relationships'].map(key=>[key,current[key]]));
-function resetTownFlow(){
-  townScene.cancel();townTask=null;storyQueue=[];storyIndex=0;storyContinuation=null;
-  currentMoment=null;selectedPlace=null;storyElapsed=0;
-}
-function tellStories(records,before,continuation){
-  storyQueue=records.length?records:[{title:'那些平凡的日子',text:`这一年，你在${routinePlace(current).name}和熟悉的街道间来往。生活也在这些小事里，慢慢往前。`}];
-  storyIndex=0;storyElapsed=0;storyContinuation=continuation;
-  currentMoment={...storyQueue[0],before,label:current.age+' 岁 · 正在经历'};
-  renderGame();
-  if(innerWidth<=850&&!fastForward&&!current.auto)$('.moment-card')?.scrollIntoView({behavior:'smooth',block:'start'});
-}
-function nextStory(){
-  if(!storyQueue.length)return;
-  storyIndex++;storyElapsed=0;
-  if(storyIndex<storyQueue.length){
-    currentMoment={...storyQueue[storyIndex],label:current.age+' 岁 · 正在经历'};
-    renderGame();return;
-  }
-  const continuation=storyContinuation;
-  storyQueue=[];storyIndex=0;storyContinuation=null;currentMoment=null;
-  renderGame();lastTick=performance.now();elapsed=0;
-  continuation?.();
-}
-function beginTownTask({place,label,kind='activity',complete}){
-  if(townTask||storyQueue.length||view!=='game')return;
-  const lifeId=current.id,age=current.age,quick=fastForward||(current.auto&&speed>=8);
-  const task={lifeId,age,place,label,kind,paused:false,phase:'walking'};
-  townTask=task;currentMoment=null;
-  renderGame();
-  townScene.move(place,label,{quick,duration:quick?650:kind==='year'?1000:1800,complete:()=>{
-    if(townTask!==task||view!=='game'||current.id!==lifeId||current.age!==age)return;
-    townTask=null;complete();
-  }});
-  if(innerWidth<=850&&!fastForward&&!current.auto)$('.town-world')?.scrollIntoView({behavior:'smooth',block:'start'});
-}
-function chooseTownActivity(place,id){
-  const item=townActivities(current,place,countries).find(a=>a.id===id);
-  if(!item||item.disabled||current.pending||storyQueue.length)return;
-  const before=statSnapshot(),last=current.events.at(-1)?.id;
-  beginTownTask({place,label:item.verb,complete:()=>{
-    const result=performTownActivity(current,place,id,countries);
-    save();
-    if(result.ok)tellStories(current.events.filter(e=>e.id>last),before,()=>{});
-    else {renderGame();toast(result.message);}
-  }});
-}
+const decisionKey = () => current ? [current.id,current.age,current.pending,current.deep?.experience?.activeEvent?.id||current.deep?.experience?.chapter||""].join(":") : "";
 try {
   const stored = JSON.parse(localStorage.getItem(PREF) || "{}");
   preferences =
@@ -247,7 +193,6 @@ function closeModal(chosen = false) {
   lastTick = performance.now();
 }
 function showHome() {
-  resetTownFlow();
   running = false;
   fastForward = false;
   autoPreview = null;
@@ -267,7 +212,6 @@ function showHome() {
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 function showGame() {
-  resetTownFlow();
   view = "game";
   document.body.dataset.view = view;
   $("#registration-view").classList.add("hidden");
@@ -294,7 +238,7 @@ function setSampling(mode) {
   renderBars();
 }
 function weights(mode = sampling, setting = worldSettings()) {
-  const rows = worldCountries(countries, setting.world, setting.year).map(
+  const rows = worldCountries(countries, setting.world, setting.year).filter(c=>referenceCountryIds.has(c.id)).map(c=>setting.world==='today'?referenceCountry(c):c).map(
     (c) => ({
       ...c,
       weight: c.population * (mode === "population" ? 1 : c.birthRate / 1000),
@@ -335,7 +279,7 @@ function renderBars() {
     `<div class="country-row other-countries"><span class="country-label">其余 ${rows.length - 9} 个地区</span><div class="country-track"><div class="country-fill" style="width:${Math.min(1, rows.slice(9).reduce((sum, c) => sum + c.probability, 0) / max) * 100}%"></div></div><span class="country-pct">${(rows.slice(9).reduce((sum, c) => sum + c.probability, 0) * 100).toFixed(1)}%</span></div>`;
   const setting = worldSettings();
   $("#data-description").textContent =
-    `${setting.world === "past" ? setting.year : setting.world === "future" ? "2050 情景假设" : meta.year} 年${setting.world === "future" ? "游戏情景" : "世界银行 WDI"} · ${rows.length} 个国家和地区`;
+    `${worldSource(setting)} · ${rows.length} 个国家和地区`;
   syncWorldControls();
 }
 function worldSettings(value = $("#world-select")?.value || "today") {
@@ -355,7 +299,7 @@ function worldSettings(value = $("#world-select")?.value || "today") {
 function worldSource(setting = worldSettings()) {
   return setting.world === "future"
     ? "2050 年游戏情景假设（非人口预测）"
-    : `${setting.world === "past" ? setting.year : meta.year} 年世界银行 WDI 固定截面`;
+    : setting.world === "past" ? `${setting.year} 年世界银行 WDI 固定截面` : "公开统计页 · 多来源最新可用年份";
 }
 function renderArchives() {
   const lives = history.slice(0, 10);
@@ -400,7 +344,6 @@ function birth(seed) {
   showRegistration();
 }
 function showRegistration() {
-  resetTownFlow();
   closeModal();
   running = false;
   view = "registration";
@@ -425,42 +368,52 @@ function showRegistration() {
   );
   window.scrollTo({ top: 0, behavior: "instant" });
 }
+function renderTimeline() {
+  const timeline=$('.timeline');
+  if(!timeline || !current)return;
+  const template=document.createElement('template');
+  template.innerHTML=gameMarkup({s:current,countries,running,speed,timelineLimit,musicOn,expandedEvents,fastForward});
+  const next=template.content.querySelector('.timeline');
+  const old=new Map([...timeline.children].map(e=>[e.dataset.eventid,e]));
+  let previous=null;
+  for(const row of [...next.children]){
+    const item=old.get(row.dataset.eventid)||row;
+    if(!old.has(row.dataset.eventid))item.classList.add('event-arriving');
+    const position=previous?previous.nextElementSibling:timeline.firstElementChild;
+    if(item!==position)timeline.insertBefore(item,position);
+    old.delete(row.dataset.eventid);previous=item;
+  }
+  for(const row of old.values())row.remove();
+}
 function renderGame() {
   if (!current) return;
   const open = $(".game-menu") && !$(".game-menu").hidden;
-  const retainedMap=$('#town-map');
-  const folds=new Map([...document.querySelectorAll('#game-view details[data-fold]')].map(node=>[node.dataset.fold,node.open]));
   $("#game-view").innerHTML = gameMarkup({
     s: current,
     countries,
-    running:townTask?!townTask.paused:running,
+    running,
     speed,
     timelineLimit,
     musicOn,
     expandedEvents,
     fastForward,
-    moment:currentMoment,
-    activity:townTask,
-    selectedPlace,
-    storyIndex,
-    storyCount:storyQueue.length,
   });
   if (innerWidth <= 1250) $(".game-menu").append($(".game-extra-controls"));
-  if(retainedMap?.dataset.life===current.id){
-    const fresh=$('#town-map'),hotspots=[...fresh.querySelectorAll('[data-town-place]')];
-    retainedMap.querySelectorAll('[data-town-place]').forEach(node=>node.remove());
-    retainedMap.append(...hotspots);fresh.replaceWith(retainedMap);
-  }
-  document.querySelectorAll('#game-view details[data-fold]').forEach(node=>{if(folds.has(node.dataset.fold))node.open=folds.get(node.dataset.fold);});
-  townScene.attach($('#town-map'),current);
-  if(!townTask)$('#town-current-action').textContent=townScene.label||routinePlace(current).verb;
+  if (innerWidth <= 650) document.querySelectorAll('.profile-card,.game-insights .insight-card').forEach((panel,index)=>{
+    const heading=panel.querySelector('.panel-title');
+    const toggle=document.createElement('button');
+    toggle.className='panel-collapse';toggle.dataset.action='panel-collapse';toggle.dataset.panel=index;
+    toggle.textContent=collapsedPanels.has(index)?'▸':'⌄';
+    toggle.setAttribute('aria-expanded',String(!collapsedPanels.has(index)));
+    toggle.setAttribute('aria-label',(collapsedPanels.has(index)?'展开':'收起')+heading.textContent.trim());
+    panel.classList.toggle('is-collapsed',collapsedPanels.has(index));heading.append(toggle);
+  });
   if (open) {
     $(".game-menu").hidden = false;
     $("[data-action=game-menu]").setAttribute("aria-expanded", "true");
   }
 }
 function showEnding(s) {
-  resetTownFlow();
   running = false;
   endingLife = s;
   if (view !== "ending") endingOrigin = view;
@@ -484,41 +437,28 @@ function revealEnding() {
 }
 function performStep() {
   if (!current || current.stage !== "living") return;
-  if(townTask||storyQueue.length)return;
   if (pauseForReflection()) return;
   if (current.pending) {
-    if (current.auto) autoChoose();
-    else showDecision();
+    if (decisionReady(current)) current.auto ? autoChoose() : showDecision();
     return;
   }
-  const place=routinePlace(current);
-  beginTownTask({place:place.id,label:current.age<2?'在家人的照顾中长大':place.verb,kind:'year',complete:finishYear});
-}
-function finishYear(){
-  const lastEvent=current.events.at(-1)?.id,before=statSnapshot();
   step(current, countries);
   save();
-  const records=current.events.filter(e=>e.id>lastEvent);
+  renderGame();
   if (current.stage === "ended") {
     running = false;
     archive(current);
-    tellStories(records,before,()=>showEnding(current));
-    return;
-  }
-  tellStories(records,before,()=>{
-    if(pauseForReflection()){fastForward=false;return;}
-    if(current.pending){fastForward=false;current.auto?autoChoose():showDecision();}
-    else if(fastForward&&records.some(e=>/告别|离世|毕业|出生/.test(e.title))){fastForward=false;running=false;renderGame();}
-  });
+    showEnding(current);
+  } else if (pauseForReflection()) return;
+  else if (decisionReady(current)) current.auto ? autoChoose() : showDecision();
 }
 function showDecision(automatic = false) {
-  if (!current?.pending) return;
-  if(storyQueue.length||townTask)return;
+  if (!current?.pending || !decisionReady(current)) return;
   const d = pendingDecision(current,countries);
   if (!d) return;
   modal(
     "重大抉择",
-    `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p>${d.age===2?'<aside class="choice-context-note">人格差异与遗传和环境都有关。2015 年一项综合研究的平均遗传率估计约为 40%。<a href="https://pubmed.ncbi.nlm.nih.gov/25961374/" target="_blank" rel="noopener">Vukasović 与 Bratko</a></aside>':''}<div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}"><span class="choice-number">${i+1}</span><span><b>${esc(c.title)}</b><small>${esc(c.hint)}</small></span></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。收起窗口后，时间会停在这里等你。</p>`,
+    `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p>${d.age===2?'<aside class="choice-context-note">人格差异与遗传和环境都有关。2015 年一项综合研究的平均遗传率估计约为 40%。<a href="https://pubmed.ncbi.nlm.nih.gov/25961374/" target="_blank" rel="noopener">Vukasović 与 Bratko</a></aside>':''}<div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}" ${c.disabled?"disabled":""}><span class="choice-number">${i+1}</span><span><b>${esc(c.title)}</b><small>${esc(c.hint)}</small></span></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。收起窗口后，时间会停在这里等你。</p>`,
   );
   $('#modal').dataset.choiceAge=String(current.age);
   if (automatic) {
@@ -532,17 +472,9 @@ function showDecision(automatic = false) {
   }
 }
 function autoChoose() {
-  if (!current?.pending) return;
+  if (!current?.pending || !decisionReady(current)) return;
   if (suppressedDecision === decisionKey()) return;
   if (!autoPreview) showDecision(true);
-}
-function resolveChoice(index){
-  const before=statSnapshot(),last=current.events.at(-1)?.id;
-  if(!choose(current,index,countries))return;
-  closeModal(true);save();elapsed=0;lastTick=performance.now();
-  tellStories(current.events.filter(e=>e.id>last),before,()=>{
-    if(current.pending)setTimeout(()=>current.auto?autoChoose():showDecision(),0);
-  });
 }
 function statistics() {
   modal(
@@ -766,7 +698,7 @@ async function downloadCard() {
 function about() {
   modal(
     "ABOUT THIS EXPERIMENT / 关于这个实验",
-    `<h2 class="modal-title">看见别人，也重新看见自己。</h2><div class="about-text"><p>这个独立实现的人生模拟，玩法灵感来自 <a href="https://1in8b.life/en/" target="_blank" rel="noopener">1 in 8 Billion</a>。没有复制原站源代码、美术、文字或玩家内容，也不与原站的纪念馆、账户或付费系统互通。</p><h3>哪些来自统计？</h3><p>出生地使用世界银行 WDI 2023 年人口与粗出生率加权抽取，覆盖 ${countries.length} 个有完整人口、出生率和寿命数据的国家和地区。预期寿命与人均 GDP（PPP）同样来自 WDI。人口合计约 ${(countries.reduce((a, c) => a + c.population, 0) / 1e8).toFixed(1)} 亿，估计年出生人数约 ${(countries.reduce((a, c) => a + (c.population * c.birthRate) / 1000, 0) / 1e8).toFixed(2)} 亿。还可以选择 1970、1990、2010 年历史截面；2050 年为明确标注的游戏假设，不是人口预测。每一局始终沿用开局选定的统计环境。</p><h3>哪些是游戏？</h3><p>姓名、性别抽签、家庭条件、城市或乡村、职业、收入、关系、选择与事件均是虚构规则。寿命使用 WDI 婴儿、五岁前、成年死亡概率和男女预期寿命作锚点，以分年龄曲线插值；可以遇到婴幼儿、未成年或高龄结局。缺失锚点用地区中位数估计，5至14岁风险仍为模型假设，未复用原站生命表。死因为虚构叙事，未按 WHO 死因比例校准。收入以人均 GDP 为游戏基数，缺失时使用收入组估计，不能视作当地实际工资。温柔模式减少普通疾病事件。页面的告别计数使用约每秒 2 人的演示值。</p><h3>你的故事，留在你这里</h3><p>完整进度、人生停顿和本地档案只存于浏览器。你可以自愿预览并公开一段已结束的虚构人生摘要；公开纪念、烛光与留言保存在本站服务器，可凭本机管理凭证撤回。没有账户和第三方分析。分享起点链接包含随机种子、抽样方式与世界设置；下载的卡片保存在你的设备。更换设备前请在「我的人生」导出档案。</p><p>数据：<a href="https://data.worldbank.org" target="_blank" rel="noopener">世界银行 WDI（CC BY 4.0）</a>，地图：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth（公共领域）</a>。<a href="https://github.com/fengbule/birth" target="_blank" rel="noopener">源代码与部署说明 ↗</a></p></div>`,
+    `<h2 class="modal-title">看见别人，也重新看见自己。</h2><div class="about-text"><p>这个独立实现的人生模拟，玩法灵感来自 <a href="https://1in8b.life/en/" target="_blank" rel="noopener">1 in 8 Billion</a>。界面与交互参照公开页面，程序和美术在本仓库实现，国家统计摘录原站公开统计页并保留来源，也不与原站的纪念馆、账户或付费系统互通。</p><h3>哪些来自统计？</h3><p>今日起点覆盖 172 个国家和地区，人口、出生占比、男女预期寿命及经济社会指标摘录自原站公开国家统计页，保留页面显示的四舍五入精度。其来源包括联合国《世界人口展望2024》、UN IGME、WHO、UNESCO、世界银行等，指标年份并不完全一致。出生地按公开出生占比或人口加权抽取，在覆盖地区归一化。还可以选择 1970、1990、2010 年历史截面；2050 年为明确标注的游戏假设，不是人口预测。每一局始终沿用开局选定的统计环境。</p><h3>哪些是游戏？</h3><p>姓名、性别抽签、家庭条件、职业、收入、关系、选择与事件均是虚构规则；城市与宗教按公开统计中的列表及比例抽取。寿命使用公开统计中的婴儿、五岁前、男女预期寿命，以及 WDI 成年死亡概率作锚点，以分年龄曲线插值；可以遇到婴幼儿、未成年或高龄结局。缺失锚点用地区中位数估计，5至14岁风险仍为模型假设，未复用原站生命表。死因为虚构叙事，未按 WHO 死因比例校准。收入以人均 GDP 为游戏基数，缺失时使用收入组估计，不能视作当地实际工资。温柔模式减少普通疾病事件。页面的告别计数使用约每秒 2 人的演示值。</p><h3>你的故事，留在你这里</h3><p>完整进度、人生停顿和本地档案只存于浏览器。你可以自愿预览并公开一段已结束的虚构人生摘要；公开纪念、烛光与留言保存在本站服务器，可凭本机管理凭证撤回。没有账户和第三方分析。分享起点链接包含随机种子、抽样方式与世界设置；下载的卡片保存在你的设备。更换设备前请在「我的人生」导出档案。</p><p>数据：<a href="https://data.worldbank.org" target="_blank" rel="noopener">世界银行 WDI（CC BY 4.0）</a>，地图：<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">Natural Earth（公共领域）</a>。<a href="https://github.com/fengbule/birth" target="_blank" rel="noopener">源代码与部署说明 ↗</a></p></div>`,
   );
 }
 function confirmNew() {
@@ -814,13 +746,6 @@ document.addEventListener("click", async (e) => {
   const target = e.target.closest("button,[data-memory],[data-action]");
   if (!target) return;
   if (target.matches("a[data-action]")) e.preventDefault();
-  if(target.dataset.townPlace){
-    selectedPlace=target.dataset.townPlace;
-    renderGame();
-    if(innerWidth<=850)$('.place-panel')?.scrollIntoView({behavior:'smooth',block:'nearest'});
-    return;
-  }
-  if(target.dataset.townActivity){chooseTownActivity(target.dataset.place,target.dataset.townActivity);return;}
   if (target.dataset.world) {
     $("#world-select").value =
       target.dataset.world === "past" ? "past-1990" : target.dataset.world;
@@ -852,14 +777,19 @@ document.addEventListener("click", async (e) => {
   if (target.dataset.speed) {
     speed = Number(target.dataset.speed);
     running = true;
-    if(townTask)townTask.paused=false;
     fastForward = false;
     elapsed = 0;
     renderGame();
     return;
   }
   if (target.dataset.choice !== undefined) {
-    resolveChoice(Number(target.dataset.choice));
+    if (choose(current, Number(target.dataset.choice), countries)) {
+      closeModal(true);
+      save();
+      renderGame();
+      lastTick = performance.now();
+      if (current.pending) setTimeout(()=>current.auto?autoChoose():showDecision(),0);
+    }
     return;
   }
   if (target.dataset.star !== undefined) {
@@ -896,19 +826,18 @@ document.addEventListener("click", async (e) => {
         showGame();
         running = true;
         renderGame();
-        if (current.pending) showDecision();
+        if (decisionReady(current)) showDecision();
       }
     }
     return;
   }
   switch (target.dataset.action) {
-    case 'moment-next':nextStory();break;
-    case 'place-close':selectedPlace=null;renderGame();break;
-    case 'activity-cancel':
-      townScene.cancel();townTask=null;elapsed=0;renderGame();break;
-    case 'town-profile':{
-      const dossier=$('.character-dossier');
-      if(dossier){dossier.open=true;dossier.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    case "panel-collapse": {
+      const index = Number(target.dataset.panel);
+      if (collapsedPanels.has(index)) collapsedPanels.delete(index);
+      else collapsedPanels.add(index);
+      renderGame();
+      $(".panel-collapse[data-panel='" + index + "']").focus({ preventScroll: true });
       break;
     }
     case "event-expand": {
@@ -1000,7 +929,7 @@ document.addEventListener("click", async (e) => {
           showGame();
           running = true;
           renderGame();
-          if (current.pending) showDecision();
+          if (decisionReady(current)) showDecision();
         }
       }
       break;
@@ -1033,16 +962,14 @@ document.addEventListener("click", async (e) => {
       closeModal();
       break;
     case "pause":
-      if(townTask){townTask.paused=!townTask.paused;renderGame();break;}
       running = !running;
       fastForward = false;
       elapsed = 0;
       lastTick = performance.now();
       renderGame();
-      if (running && current.pending) showDecision();
+      if (running && decisionReady(current)) showDecision();
       break;
     case "next-year":
-      if(storyQueue.length){nextStory();break;}
       running = false;
       performStep();
       break;
@@ -1061,7 +988,7 @@ document.addEventListener("click", async (e) => {
         suppressedDecision = null;
       }
       save();
-      if (current.auto && current.pending && !storyQueue.length && !townTask) autoChoose();
+      if (current.auto && decisionReady(current)) autoChoose();
       renderGame();
       break;
     case "decision":
@@ -1174,17 +1101,6 @@ setInterval(() => {
   const now = performance.now(),
     delta = Math.min(1000, now - lastTick);
   lastTick = now;
-  if(view==='game'&&current&&!document.hidden&&!$('#modal').open){
-    townScene.tick(delta,townTask?townTask.paused:!running);
-    if(townTask)return;
-    if(storyQueue.length){
-      if((running||current.stage==='ended')&&(current.auto||fastForward)){
-        storyElapsed+=delta;
-        if(storyElapsed>=(fastForward?550:3800))nextStory();
-      }
-      return;
-    }
-  }
   if (view === "ending" && endingPlayback && !document.hidden) {
     const playback = endingPlayback, frame = playback.frames[playback.index];
     if (frame.kind !== "final") {
@@ -1206,7 +1122,11 @@ setInterval(() => {
       if (autoPreview.remaining <= 0) {
         const pick = autoPreview.pick;
         autoPreview = null;
-        resolveChoice(pick);
+        choose(current,pick,countries);
+        closeModal(true);
+        save();
+        renderGame();
+        if (current.pending) setTimeout(()=>autoChoose(),0);
       }
       return;
     }
@@ -1224,17 +1144,25 @@ setInterval(() => {
     pauseForReflection();
     return;
   }
-  if (current.pending) {
+  if (decisionReady(current)) {
+    fastForward = false;
     if (current.auto) autoChoose();
     return;
   }
-  elapsed += delta;
   const interval = fastForward
     ? Math.min(1000,yearInterval(current.duration,livingCountry(current,countries).life,24))
     : yearInterval(current.duration,livingCountry(current,countries).life,speed);
-  $(".game-heading > p")?.style.setProperty("--year-progress",`${Math.min(100,elapsed/interval*100)}%`);
-  if (elapsed >= interval) {
-    elapsed = 0;
+  const changed = advanceClock(current,delta / interval);
+  if (changed) { save(); renderTimeline(); }
+  const clock = clockFor(current);
+  $(".game-heading > p")?.style.setProperty("--year-progress",`${clock.fraction*100}%`);
+  if (decisionReady(current)) {
+    fastForward = false;
+    renderGame();
+    if (current.auto) autoChoose(); else showDecision();
+    return;
+  }
+  if (clock.fraction >= 1) {
     if (current.auto && initSystems(current).autoFocus !== false && current.age >= 6) {
       const choices = focusOptions(current);
       current.focus = choices[Math.floor(random(current)*choices.length)][0];
@@ -1306,7 +1234,7 @@ async function init() {
     if (!eraResponse.ok) throw Error("historical data");
     configureEras(await eraResponse.json());
     meta = await r.json();
-    countries = meta.countries;
+    countries = withReferenceCountries(meta.countries);
     if (!countries.length) throw Error("data");
     load();
     if (current) initSystems(current);
@@ -1322,7 +1250,7 @@ async function init() {
       saveNote,
       showMemory,
     });
-    const opts = [...countries].sort((a, b) =>
+    const opts = countries.filter(c=>referenceCountryIds.has(c.id)).sort((a, b) =>
       a.name.localeCompare(b.name, "zh-CN"),
     );
     $("#origin-select").innerHTML =

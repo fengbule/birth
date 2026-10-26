@@ -4,6 +4,11 @@ import { appendRecord } from "./records.js";
 import { experience, recordYear, temperamentName } from "./experience.js";
 import { activateQueuedEvent, queuedDecision, resolveQueuedEvent } from "./life-events.js";
 import { sampleLifetime } from "./mortality.js";
+import { initChronology, chronologyYear, chronologyDecision, resolveChronology, validChronology } from './chronology.js';
+import { scheduleYear, validClock } from './timeline-clock.js';
+import coverage from './data/reference-coverage.json' with {type:'json'};
+import { referenceCountry } from './reference-data.js';
+export const referenceCountryIds = new Set(coverage.countryIds);
 import {
   initSystems,
   livingCountry,
@@ -138,6 +143,7 @@ export function createLife(countries, options = {}) {
   const seed = Number(options.seed) >>> 0 || 1;
   const s = {
     schema: SCHEMA,
+    flowVersion: options.flowVersion === 1 ? 1 : 2,
     id: `${seed}-${options.createdAt || Date.now()}`,
     seed,
     rng: seed,
@@ -171,7 +177,9 @@ export function createLife(countries, options = {}) {
     note: "",
     auto: false,
   };
-  const pool = worldCountries(countries, options.world || "today", s.year);
+  const available = worldCountries(countries, options.world || "today", s.year);
+  const covered = s.flowVersion===2 && countries.length>1 ? available.filter(c=>referenceCountryIds.has(c.id)) : available;
+  const pool = (covered.length ? covered : available).map(c=>s.flowVersion===2 && (!options.world||options.world==='today')?referenceCountry(c):c);
   const c = weightedCountry(pool, s.mode, s);
   s.country = c.id;
   s.sex = random(s) < 0.488 ? "女" : "男";
@@ -210,6 +218,8 @@ export function createLife(countries, options = {}) {
     `你在${c.name}的一个${s.home}家庭降生。你还不知道世界有多大，家人的怀抱就是全部。`,
     "birth",
   );
+  initChronology(s,c,()=>random(s));
+  if(s.flowVersion===2) scheduleYear(s,s.events);
   return s;
 }
 export function addEvent(s, title, text, type = "life") {
@@ -637,6 +647,8 @@ function applyEffects(s, e) {
 }
 export function annualIncome(s, c) {
   const d = initSystems(s);
+  if (s.flowVersion===2 && /学生|大学生|研究生|军校学生|婴儿|全职家管/.test(s.occupation)) return 0;
+  if (s.flowVersion===2 && s.age>=12 && s.age<18 && /帮忙家里|初入职场/.test(s.occupation)) return Math.round(incomeBase(c)*.08);
   if (s.age < 18 || s.education === "大学在读") return 0;
   if (d.career.unemployed > 0 && !s.retired)
     return Math.round(incomeBase(c) * 0.035);
@@ -655,6 +667,8 @@ export function annualIncome(s, c) {
 export function step(s, countries) {
   const deep = initSystems(s);
   if (s.stage !== "living" || s.pending || deep.reflection !== null) return s;
+  delete s.clock;
+  const beforeEvent = s.events.at(-1)?.id ?? -1;
   const c = livingCountry(s, countries);
   if (!c) throw Error("Country missing");
   if (s.deathAge > 0) s.age++;
@@ -729,7 +743,7 @@ export function step(s, countries) {
     );
     return s;
   }
-  if (s.age > 3 && r() < 0.3) {
+  if (s.flowVersion !== 2 && s.age > 3 && r() < 0.3) {
     const e = smallEvents[Math.floor(r() * smallEvents.length)];
     applyEffects(s, e[2]);
     addEvent(s, e[0], e[1]);
@@ -745,21 +759,31 @@ export function step(s, countries) {
       "一场疾病让你停下脚步。休息与照料，成为这段时间最重要的事。",
     );
   }
-  const d = decisions.find((d) => d.age === s.age && (!d.legacy || !s.deep.experience));
+  const d = s.flowVersion===2 ? null : decisions.find((d) => d.age === s.age && (!d.legacy || !s.deep.experience));
   if (d) s.pending = d.age;
   yearSystems(s, countries);
+  chronologyYear(s,c,r,countries);
   activateQueuedEvent(s);
   recordYear(s);
-  if (s.age % 10 === 0 && !d)
+  if (s.flowVersion !== 2 && s.age % 10 === 0 && !d)
     addEvent(
       s,
       `${s.age} 岁，新的十年`,
       `你走过了许多普通的日子，也在不知不觉中成为了今天的自己。`,
     );
+  if(s.flowVersion===2) scheduleYear(s,s.events.filter(e=>e.id>beforeEvent));
   return s;
 }
 export function choose(s, index, countries) {
   if (s.stage !== "living") return false;
+  if (s.pending && s.deep?.experience?.chapter) {
+    const c = livingCountry(s,countries);
+    const resolved = resolveChronology(s,index,c,()=>random(s));
+    if(resolved){
+      afterChoice(s,countries);s.income=annualIncome(s,c);activateQueuedEvent(s);recordYear(s);
+    }
+    return resolved;
+  }
   if (s.pending === "life-event") {
     const resolved=resolveQueuedEvent(s,index,countries);
     if(resolved){s.income=annualIncome(s,livingCountry(s,countries));recordYear(s);}
@@ -856,6 +880,7 @@ export function choose(s, index, countries) {
 export function pendingDecision(s,countries) {
   if (!s?.pending) return null;
   if (s.pending === "life-event") return queuedDecision(s,countries);
+  if (s.deep?.experience?.chapter) return chronologyDecision(s,livingCountry(s,countries));
   const d = s.pending === "scene" ? specialDecisionFor(s) : decisions.find(d=>d.age===s.pending);
   if (d?.age !== 2 || s.seed % 2 === 0) return d;
   return {...d,title:"两岁，家里来了新面孔",text:"家里来了几位不熟悉的客人。有人聊天，有人在门边招手。你会怎样认识这些新面孔？"};
@@ -950,7 +975,7 @@ export function validateLife(s, countries) {
     if (typeof s[k] !== "string" || s[k].length > 150) return false;
   if (
     ![5, 15, 30, 60, 90].includes(s.duration) ||
-    ![null, "scene", "life-event", ...decisions.map((d) => d.age)].includes(s.pending) ||
+    ![null, "scene", "life-event", 15, 22, ...decisions.map((d) => d.age), ...(s.deep?.experience?.chapter?[s.age]:[])].includes(s.pending) ||
     (s.pending !== null && !["scene","life-event"].includes(s.pending) && s.pending !== s.age)
   )
     return false;
@@ -964,6 +989,7 @@ export function validateLife(s, countries) {
         Number.isInteger(e.age) &&
         e.age >= 0 &&
         e.age <= s.age &&
+        (e.phase === undefined || (Number.isFinite(e.phase) && e.phase >= 0 && e.phase <= 1)) &&
         (i === 0 || e.id > s.events[i - 1].id) &&
         typeof e.title === "string" &&
         e.title.length < 200 &&
@@ -986,5 +1012,5 @@ export function validateLife(s, countries) {
     )
   )
     return false;
-  return validateSystems(s, countries);
+  return validateSystems(s, countries) && validChronology(s) && validClock(s.clock,s);
 }

@@ -6,7 +6,7 @@ import { initSystems, performAction } from '../public/systems.js';
 import { places, townActivities, performTownActivity, routeBetween, routinePlace } from '../public/town-activities.js';
 import { TownScene } from '../public/town-scene.js';
 const countries=JSON.parse(readFileSync(new URL('../public/data/countries.json',import.meta.url))).countries;
-const life=(age=0)=>{const s=createLife(countries,{seed:88,reflections:false});s.stage='living';s.age=age;return s;};
+const life=(age=0)=>{const s=createLife(countries,{seed:88,reflections:false,flowVersion:1});s.stage='living';s.age=age;return s;};
 
 test('locations and actions unlock with age; pending stories block all activities',()=>{
   for(const age of [0,2,6,7,12,18,65]){

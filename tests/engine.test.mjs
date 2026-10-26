@@ -101,8 +101,8 @@ test("malformed imports cannot enter the simulation", () => {
   ])
     assert.equal(validateLife({ ...good, ...patch }, countries), false);
 });
-test("spending, education, and retirement change the economic model", () => {
-  const s = createLife(countries, { seed: 5 }),
+test("legacy spending, education, and retirement retain their economic effects", () => {
+  const s = createLife(countries, { seed: 5, flowVersion: 1 }),
     c = countries.find((c) => c.id === s.country);
   s.stage = "living";
   s.age = 23;
@@ -123,10 +123,10 @@ test("spending, education, and retirement change the economic model", () => {
   assert.ok(s.money < 1e7);
   assert.equal(s.housing, "按揭中的家");
 });
-test("each milestone resolves every offered option exactly once", () => {
+test("legacy archives retain every prior milestone and option", () => {
   for (const d of decisions)
     for (let i = 0; i < d.choices.length; i++) {
-      const s = createLife(countries, { seed: 99 });
+      const s = createLife(countries, { seed: 99, flowVersion: 1 });
       s.stage = "living";
       s.age = d.age;
       s.pending = d.age;

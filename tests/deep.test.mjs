@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createLife, step, choose, validateLife } from "../public/engine.js";
+import { createLife, step, choose, validateLife, pendingDecision } from "../public/engine.js";
 import {
   configureEras,
   initSystems,
@@ -22,7 +22,7 @@ configureEras(
   ),
 );
 const adult = () => {
-  const s = createLife(countries, { seed: 88 });
+  const s = createLife(countries, { seed: 88, flowVersion: 1 });
   s.stage = "living";
   s.age = 28;
   s.money = 1000000;
@@ -128,7 +128,7 @@ test("1000 lives with all new choices, actions and reflections complete and vali
     let n = 0;
     while (s.stage === "living" && n++ < 190) {
       if (s.deep.reflection !== null) remember(s, "记得生活。");
-      else if (s.pending) choose(s, seed % 3, countries);
+      else if (s.pending) {const enabled=pendingDecision(s,countries).choices.map((c,i)=>c.disabled?null:i).filter(i=>i!==null);choose(s,enabled[seed%enabled.length],countries);}
       else {
         if (s.age >= 18 && s.money > 5000) transact(s, "bonds", 100, countries);
         performAction(s, "parents", countries);

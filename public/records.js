@@ -3,6 +3,7 @@ export function appendRecord(s, title, text, type = "life") {
   const record = {
     id: (s.events.at(-1)?.id ?? -1) + 1,
     age: s.age,
+    phase: s.clock?.age===s.age ? s.clock.fraction : 0,
     title,
     text,
     type,
@@ -13,7 +14,8 @@ export function appendRecord(s, title, text, type = "life") {
     const disposable = s.events.findIndex(
       (e) => !e.star && !["birth", "decision", "end"].includes(e.type),
     );
-    s.events.splice(disposable < 0 ? 0 : disposable, 1);
+    const [removed] = s.events.splice(disposable < 0 ? 0 : disposable, 1);
+    if (s.clock) s.clock.moments = s.clock.moments.filter(m=>m.id!==removed.id);
   }
   return record;
 }

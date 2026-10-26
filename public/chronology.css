@@ -1,0 +1,102 @@
+/* Dimensions and control placement checked against the public life screen. */
+.game-controls button{font-size:13px;padding:6px 9px;line-height:20.8px;border-radius:2px}
+.game-controls .menu-toggle{display:none}
+.game-controls .game-extra-controls{display:flex}
+.game-toolbar{padding:13px 0}
+.game-heading>p{font-family:ui-monospace,'Microsoft YaHei',monospace}
+.identity-portrait svg{position:static;width:100%;height:100%;max-width:100%}
+.identity-body{position:relative}
+.identity-body:before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.16;background:repeating-radial-gradient(ellipse at 72% 70%,transparent 0 10px,#93c2bb 11px,transparent 12px 21px)}
+.identity-body>div{position:relative}
+.identity-body h1{white-space:normal}
+.family-dots{letter-spacing:2px}
+.identity-body dl{margin:0}
+.identity-code{margin:0}
+.financial-summary b{margin-top:5px}
+.finance-entry{width:100%;font-size:13px;border:1px solid var(--line);border-radius:3px;padding:7px 10px;margin-top:12px;background:var(--green-soft)}
+.scene-caption{min-height:46px}
+.scene-caption .scene-family{white-space:normal;line-height:1.6;font-size:14px;color:var(--ink)}
+.focus-box>p{margin:10px 0 0;font-size:13px;line-height:1.8}
+.focus-box .panel-title{margin-bottom:10px}
+.focus-choices{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}
+.focus-choices button{border-radius:18px;padding:5px 10px;text-align:center}
+.focus-choices b{font-weight:400;font-size:13px}
+.focus-choices small{font-size:10px;margin-top:0}
+.focus-select-label{display:none!important}
+.story-column{padding:16px}
+.timeline-heading>span{font-size:11px;color:var(--muted)}
+.event{padding:10px 0;gap:12px;grid-template-columns:48px minmax(0,1fr);border-bottom:1px solid var(--line);border-top:0;background:none;outline-offset:2px}
+.event p{font-size:14px;line-height:1.65;margin:0;color:var(--ink)}
+.event.major-event p{font-weight:600}
+.event-arriving{animation:entry-appear .3s ease both}
+@keyframes entry-appear{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.event-arriving{animation:none}}
+.event .event-age{font-size:11px}
+.event:last-child{border-bottom:1px solid var(--line)}
+.event.decision{background:none;margin-inline:0;padding-inline:0}
+.family-row{margin-top:14px;font-size:13px;align-items:start}
+.family-row>span{color:var(--muted)}
+.family-row b{font-size:13px;font-weight:400}
+.family-row small{font-size:12px;line-height:1.65;margin-top:1px;color:var(--muted)}
+.life-squares{grid-template-columns:repeat(10,minmax(0,1fr));gap:3px}
+.life-squares i{width:auto;height:auto;aspect-ratio:1;min-width:0;border-radius:1px;background:#dbe3df}
+.life-squares .current{outline:2px solid var(--accent);outline-offset:-1px}
+.country-overview dl{margin:0}
+.country-overview dl>div{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:8px;font-size:13px}
+.country-overview dt{color:var(--muted)}
+.country-overview dd{margin:0;text-align:right;font-family:ui-monospace,'Microsoft YaHei',monospace}
+.country-source{font-size:11px;line-height:1.65;color:var(--muted);margin-top:16px}
+.survival-chart{width:100%;height:auto;margin-top:14px;display:block}
+.shop-context{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 16px}
+#modal:has(.consumption-list){width:min(580px,calc(100% - 32px))}
+.peer{margin-top:8px;padding-top:8px}
+.choice-dialog{width:574px;max-width:calc(100% - 32px);padding:25px}
+.choice-dialog .modal-title{font-family:var(--serif);font-size:26px;line-height:1.5}
+.choice-dialog .modal-description{font-size:15px;line-height:1.8}
+.choice-dialog .choice-button{background:var(--bg);min-height:52px;padding:13px 16px}
+.choice-dialog .choice-button:hover{border-color:var(--green)}
+.choice-dialog .choice-button b{font-size:15px;font-weight:600}
+.choice-dialog .choices{gap:8px}
+.choice-dialog .choice-auto{text-align:center}
+.choice-dialog .choice-auto>button{font-size:13px;padding:5px 10px}
+.choice-dialog .modal-heading{font-size:11px}
+.choice-dialog .choice-tag{font-family:ui-monospace,'Microsoft YaHei',monospace}
+@media(max-width:1250px){.game-controls .menu-toggle{display:block}.game-controls .game-extra-controls{display:none}.game-toolbar{padding:12px 0}}
+@media(max-width:650px){
+ .game-toolbar-inner{width:calc(100% - 24px);flex-wrap:wrap;gap:8px}
+ .game-heading{flex-basis:100%}.game-heading>p{font-size:11px;margin-left:auto}.age-display strong{font-size:34px}
+ .game-controls{width:100%;justify-content:space-between;gap:3px}.game-controls button{font-size:12px;padding:6px 7px}
+ .game-controls [data-action=next-choice]{font-size:0;padding:6px 9px}.game-controls [data-action=next-choice]:after{content:'快转 »';font-size:12px}
+ .game-grid{width:calc(100% - 24px);margin-top:12px;gap:12px}
+ .scene-card,.focus-box,.story-column{margin-bottom:12px}
+ .focus-box,.story-column{padding:14px}
+ .scene-caption{min-height:46px;padding:10px 12px}
+ .event{grid-template-columns:36px minmax(0,1fr);gap:10px}.event p{font-size:14px}
+ .timeline-heading>span{font-size:10px}.timeline-heading h2{font-size:17px}
+ .focus-choices{display:flex}.focus-choices button{flex:0 0 auto}
+ .profile-column,.life-main{display:contents}.identity-body{grid-template-columns:64px minmax(0,1fr)}
+ .game-grid{width:calc(100% - 32px);gap:0;margin-top:20px}
+ .game-toolbar-inner{width:calc(100% - 32px)}
+ .game-controls [data-action=pause]{width:36px;min-width:36px;font-size:0;padding:6px}
+ .game-controls [data-action=pause]:after{content:'❚❚';font-size:12px}.game-controls [data-action=pause][aria-pressed=true]:after{content:'▸'}
+ .peer{width:100%;display:flex;margin-right:0;padding-top:10px;margin-top:10px}
+ .panel-title{font-size:17px}
+ .profile-card .panel-title{justify-content:flex-start;gap:7px}
+ .panel-title:has(.panel-collapse){padding-right:40px;min-height:26px}
+ .panel-collapse{height:32px;width:36px;font-size:12px;border:1px solid var(--line);border-radius:50%}
+ .choice-dialog{padding:20px;max-height:calc(100dvh - 32px)}
+ .choice-dialog .modal-title{font-size:24px}
+}
+
+.game-heading>p{flex:1}
+.game-controls .feedback-link{font-size:13px;padding:6px 10px;line-height:20.8px;border:1px solid var(--line);border-radius:2px;white-space:nowrap;text-decoration:none}
+.game-controls [data-action=pause]{min-width:63px}
+.game-controls [data-action=theme]{min-width:40px}
+.stat-line{grid-template-columns:46px minmax(0,1fr) 30px}
+.family-dots{font-size:12px}
+.identity-body h1{font-size:24px}
+@media(max-width:650px){
+ .game-heading{margin-bottom:12px}.game-heading>p{font-size:12.5px}.age-display strong{font-size:38px}
+ .game-controls [data-action=pause]{min-width:36px}
+ .compact-stats{padding-top:6px;padding-bottom:6px}
+}

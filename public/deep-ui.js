@@ -12,6 +12,7 @@ import {
   reflectionQuestions,
 } from "./systems.js";
 import { readOwners as ownerTokens } from "./ownership.js";
+import { formatMoney, CNY_PPP_2023 } from './currency.js';
 import { consumptionOptions, consume } from "./life-events.js";
 const esc = (s) =>
   String(s ?? "").replace(
@@ -21,8 +22,7 @@ const esc = (s) =>
         c
       ],
   );
-const money = (n) =>
-  `${n < 0 ? "−" : ""}$${Math.round(Math.abs(n)).toLocaleString("zh-CN")}`;
+const money = n=>formatMoney(n,app?.getCurrent());
 let app,
   memorialPage = null,
   memorialId = null;
@@ -83,8 +83,8 @@ function finance() {
   const tile=item=>`<button class="consumption-button" data-consume="${item.id}" ${item.disabled?'disabled':''}><span><b>${esc(item.title)}</b><small>${esc(item.description)}</small></span><span><strong>${item.cost?money(item.cost):'免费'}</strong>${item.reason?`<small>${esc(item.reason)}</small>`:''}</span></button>`;
   const available=items.filter(i=>!i.remaining),used=items.filter(i=>i.remaining);
   app.modal(
-    "SPEND & INVEST / 消费与投资",
-    `<h2 class="modal-title">花钱 · 投资</h2><div class="balance-grid"><div><span>${s.money<0?'负债':'积蓄'}</span><strong>${money(Math.abs(s.money))}</strong></div><div><span>净资产</span><strong>${money(netWorth(s))}</strong></div></div><div class="consumption-list">${available.slice(0,5).map(tile).join('')}</div><details class="shop-more"><summary>更多项目 · ${Math.max(0,available.length-5)+used.length}</summary><div class="consumption-list">${available.slice(5).concat(used).map(tile).join('')}</div></details>${!items.length?'<p>长大后，可以在这里安排生活的支出。</p>':''}<details class="portfolio-more"><summary>投资与财务明细</summary><div class="asset-lines"><p><span>稳健组合</span><b>${money(a.bonds)}</b></p><p><span>波动组合</span><b>${money(a.stocks)}</b></p><p><span>房产 / 房贷</span><b>${money(a.house)} / ${money(a.mortgage)}</b></p><p><span>本年收入 / 专项开销</span><b>${money(d.annual.income)} / ${money(d.annual.expenses)}</b></p></div><div class="trade-form"><select id="trade-type" aria-label="财务操作"><option value="bonds">配置稳健组合</option><option value="stocks">配置波动组合</option><option value="sell-bonds">赎回稳健组合</option><option value="sell-stocks">赎回波动组合</option><option value="repay">提前偿还房贷</option></select><input type="number" id="trade-amount" min="1" max="1000000000" value="${Math.max(1, Math.round(Math.max(0, s.money) * 0.1))}" aria-label="金额"><button class="small-button" data-deep="trade" ${s.age < 18 || s.stage !== "living" ? "disabled" : ""}>确认</button></div></details><details><summary>其他年度活动</summary>${actionButtons(["exercise", "learn", "checkup", "travel", "insurance"])}</details>`,
+    "花钱 · 投资",
+    `<p class="shop-context">金额以中国大陆物价换算成人民币。这里的选择会影响健康、幸福、关系与今后的机会。选择期间，时间暂停。</p><div class="balance-grid"><div><span>${s.money<0?'负债':'积蓄'}</span><strong>${money(Math.abs(s.money))}</strong></div><div><span>净资产</span><strong>${money(netWorth(s))}</strong></div></div><div class="consumption-list">${available.slice(0,5).map(tile).join('')}</div><details class="shop-more"><summary>更多项目 · ${Math.max(0,available.length-5)+used.length}</summary><div class="consumption-list">${available.slice(5).concat(used).map(tile).join('')}</div></details>${!items.length?'<p>长大后，可以在这里安排生活的支出。</p>':''}<details class="portfolio-more"><summary>投资与财务明细</summary><div class="asset-lines"><p><span>稳健组合</span><b>${money(a.bonds)}</b></p><p><span>波动组合</span><b>${money(a.stocks)}</b></p><p><span>房产 / 房贷</span><b>${money(a.house)} / ${money(a.mortgage)}</b></p><p><span>本年收入 / 专项开销</span><b>${money(d.annual.income)} / ${money(d.annual.expenses)}</b></p></div><div class="trade-form"><select id="trade-type" aria-label="财务操作"><option value="bonds">配置稳健组合</option><option value="stocks">配置波动组合</option><option value="sell-bonds">赎回稳健组合</option><option value="sell-stocks">赎回波动组合</option><option value="repay">提前偿还房贷</option></select><input type="number" id="trade-amount" min="1" max="1000000000" value="${Math.max(1, Math.round(Math.max(0, s.money) * 0.1 * (s.flowVersion===2?CNY_PPP_2023:1)))}" aria-label="金额"><button class="small-button" data-deep="trade" ${s.age < 18 || s.stage !== "living" ? "disabled" : ""}>确认</button></div></details><details><summary>其他年度活动</summary>${actionButtons(["exercise", "learn", "checkup", "travel", "insurance"])}</details>`,
   );
 }
 function career() {
@@ -138,7 +138,7 @@ function journal() {
 function guide() {
   app.modal(
     "HOW A LIFE UNFOLDS / 深入玩法",
-    `<h2 class="modal-title">在小镇里，慢慢过一生。</h2><div class="about-text"><h3>先选地点，再经历活动</h3><p>点地图上的地点，选一件小事，跟着人物走过去。到了以后先行动，完成后才结算状态和花费。结果一次呈现一段，读完点继续。暂停会停住活动；取消或中途离开不会扣钱或增加属性。地点随年龄开放，旧经历与档案可按需展开。</p><h3>先准备，再选择</h3><p>童年把心思放在学习和陪伴上。知识影响升学、求职与迁居；关系影响亲密关系的稳定。家庭条件会影响教育机会，但不决定每次选择的结果。</p><h3>每年有三件可以主动做的事</h3><p>地图上的免费日常与关系面板共用每年三次额度，每项每年一次。成年消费按项目冷却，独立于三次额度；在地图上购买同样要等行动完成。更多关系、投资与迁居玩法收在工具菜单里。</p><h3>储备让你拥有调整的余地</h3><p>现金支持求学、迁居和失业期；房产、房贷、稳健与波动组合会持续变化。净资产包含投资和房产，并扣除房贷。只有可用现金能直接支付活动费用。</p><h3>世界不只一个起点</h3><p>开局可以选择 1970、1990、2010 年的历史数据，今日截面，或明确标注为假设的 2050 年情景。成年后可以迁居，重新适应当地经济环境。</p><h3>让人生留下回声</h3><p>开启人生停顿，收藏一个瞬间。在结束后保存卡片，或明确选择把虚构角色摘要放进公共纪念馆。完整存档始终在浏览器，公共发布只上传你预览过的摘要。</p></div>`,
+    `<h2 class="modal-title">不止是，下一年。</h2><div class="about-text"><h3>先准备，再选择</h3><p>童年把心思放在学习和陪伴上。知识影响升学、求职与迁居；关系影响亲密关系的稳定。家庭条件会影响教育机会，但不决定每次选择的结果。</p><h3>每年有三件可以主动做的事</h3><p>在「家庭与关系」「消费与投资」「工作与成长」里安排活动。免费陪伴、志愿服务也有作用。每种活动一年一次，不必把所有时间都花满。</p><h3>储备让你拥有调整的余地</h3><p>现金支持求学、迁居和失业期；房产、房贷、稳健与波动组合会持续变化。净资产包含投资和房产，并扣除房贷。只有可用现金能直接支付活动费用。</p><h3>世界不只一个起点</h3><p>开局可以选择 1970、1990、2010 年的历史数据，今日截面，或明确标注为假设的 2050 年情景。成年后可以迁居，重新适应当地经济环境。</p><h3>让人生留下回声</h3><p>开启人生停顿，收藏一个瞬间。在结束后保存卡片，或明确选择把虚构角色摘要放进公共纪念馆。完整存档始终在浏览器，公共发布只上传你预览过的摘要。</p></div>`,
   );
 }
 export async function refreshCommunity() {
@@ -301,7 +301,7 @@ async function handle(e) {
         const r = transact(
           s,
           $("#trade-type").value,
-          Number($("#trade-amount").value),
+          Math.round(Number($("#trade-amount").value)/(s.flowVersion===2?CNY_PPP_2023:1)),
           app.getCountries(),
         );
         app.save();

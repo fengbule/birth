@@ -1,3 +1,4 @@
+import { formatMoney } from './currency.js';
 import { experience, recordYear } from './experience.js';
 import { initSystems, livingCountry, migrate } from './systems.js';
 import { appendRecord } from './records.js';
@@ -9,6 +10,7 @@ export function consumptionOptions(s,countries) {
   const limit=adult&&(employed||d.partner) ? Math.max(s.income*.25,g*.12) : 0;
   const items=[
     ['dinner','和亲友聚餐',.012,1,'幸福与关系'],
+    ['hobby-practice','兴趣装备与课程',.02,1,'练习喜欢的活动，兴趣实力提高'],
     ['checkup','健康检查',.032,1,'健康与安心'],
     ['bicycle','添一辆自行车',.085,5,'日常出行与健康'],
     ['television','买一台电视',.16,8,'休闲与家庭生活'],
@@ -23,7 +25,7 @@ export function consumptionOptions(s,countries) {
     ['certificate','证照课程',.045,2,'为职业准备新的资格'],
     ['foreign','打听国外工作机会',.012,3,'了解另一片土地的生活'],
   ];
-  return items.filter(([id])=>adult && !(id==='match'&&d.partner) && !(id==='jobhunt'&&s.retired)
+  return items.filter(([id])=>(adult||(s.flowVersion===2&&s.age>=6&&['dinner','hobby-practice'].includes(id))) && !(id==='match'&&d.partner) && !(id==='jobhunt'&&s.retired)
     && !(id.startsWith('train-')&&['大学毕业','大学在读'].includes(s.education)))
     .map(([id,title,rate,years,description])=>{
       const cost=Math.round(g*rate),group=id.startsWith('train-')||id==='certificate'?'training':id;
@@ -43,6 +45,7 @@ export function consume(s,id,countries) {
   x.cooldowns[item.group]=s.age+item.years;
   const plus=(key,n)=>s[key]=clamp(s[key]+n);
   if(id==='dinner'){plus('happiness',5);plus('relationships',4);}
+  if(id==='hobby-practice'){plus('happiness',3);x.hobbySkill=Math.min(100,(x.hobbySkill||0)+8);}
   if(id==='checkup')plus('health',8);
   if(id==='bicycle'){plus('health',4);plus('happiness',3);}
   if(id==='television'||id==='travel')plus('happiness',8);
@@ -55,7 +58,7 @@ export function consume(s,id,countries) {
     const delay=id==='jobhunt'&&s.income>0&&!s.retired?2:1;
     x.queued.push({id:`${id}-${s.age}`,type:id,age:s.age+delay,...(id==='match'?{attempt:1}:{})});
   }
-  appendRecord(s,item.title,id==='jobhunt'?'你递出了求职申请，等待后续消息。':id==='match'?'你留下了自己的期望，新的相遇还需要一点时间。':id==='foreign'?'你向外地的朋友打听机会，等候进一步的消息。':`你为这件事支出了 ${item.cost.toLocaleString('zh-CN')} PPP 国际元。`,'action');
+  appendRecord(s,item.title,id==='jobhunt'?'你递出了求职申请，等待后续消息。':id==='match'?'你留下了自己的期望，新的相遇还需要一点时间。':id==='foreign'?'你向外地的朋友打听机会，等候进一步的消息。':`你为这件事支出了 ${formatMoney(item.cost,s)}。`,'action');
   recordYear(s);
   return {ok:true,message:item.borrow?'支出已记下，超出现金的部分形成负债。':'这件事已记进人生。'};
 }

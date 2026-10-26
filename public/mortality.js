@@ -6,9 +6,9 @@ const clip=(n,a,b)=>Math.min(b,Math.max(a,n));
 // Adult mortality is a cumulative 15-to-60 probability, never a yearly hazard.
 export function mortalityCurve(country,sex='男',world='today',year=2023) {
   const sourceYear=world==='past'?year:2023;
-  const key=[country.id,sex,sourceYear,country.life,world].join(':');
+  const key=[country.id,sex,sourceYear,country.life,world,country.reference?'public':'wdi'].join(':');
   if(cache.has(key))return cache.get(key);
-  const row=observations.countries[country.id]?.[sourceYear]||{};
+  const row={...(observations.countries[country.id]?.[sourceYear]||{}),...(world==='today'?country.reference||{}:{})};
   const female=sex==='女',estimated=[];
   const value=(field,fallback)=>{
     if(Number.isFinite(row[field]))return row[field];

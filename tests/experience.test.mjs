@@ -92,7 +92,7 @@ test('year records produce a conditional full record; malformed new archive fiel
   assert.ok(markup.includes('死亡纪录'));assert.ok(!markup.includes('class="record-texture"'));
   assert.ok(lifeReview(s).happiest);
   assert.ok(endingFrames(s,countries).some(f=>f.kind==='cause'));
-  const legacy=fresh();delete legacy.deep.experience;assert.ok(validateLife(legacy,countries));
+  const legacy=fresh();delete legacy.deep.experience;delete legacy.flowVersion;delete legacy.clock;delete legacy.profile;assert.ok(validateLife(legacy,countries));
   for(const patch of [{queued:[{type:'jobhunt',age:999,id:'x'}]},{temperament:[25,25,25,Infinity]},{activeEvent:{id:'x',type:'jobhunt',age:0}}]){
     const invalid=fresh();Object.assign(invalid.deep.experience,patch);assert.equal(validateLife(invalid,countries),false);
   }

@@ -31,7 +31,9 @@ export function focusOptions(s) {
 export function autoChoiceIndex(s, decision, draw) {
   const count = decision?.choices?.length || 0;
   if (!count) return null;
-  if (s.focus === 'study') return 0;
-  if (s.focus === 'connection') return Math.min(1,count-1);
-  return Math.min(count-1,Math.floor(draw()*count));
+  const enabled=decision.choices.map((c,i)=>c.disabled?null:i).filter(i=>i!==null);
+  if (!enabled.length) return null;
+  if (s.focus === 'study' && enabled.includes(0)) return 0;
+  if (s.focus === 'connection' && enabled.includes(1)) return 1;
+  return enabled[Math.min(enabled.length-1,Math.floor(draw()*enabled.length))];
 }

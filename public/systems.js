@@ -1,6 +1,7 @@
 // Independent game systems. All probabilities and prices here are game rules.
 import { appendRecord } from "./records.js";
 import { validExperience, recordYear } from "./experience.js";
+import { referenceCountry } from './reference-data.js';
 const clamp = (n, min = 0, max = 100) => Math.min(max, Math.max(min, n));
 function rng(s) {
   let t = (s.rng += 0x6d2b79f5);
@@ -85,11 +86,12 @@ export function initSystems(s, options = {}) {
 export function livingCountry(s, countries) {
   const d = initSystems(s),
     pool = worldCountries(countries, d.world, s.year);
-  return (
+  const c = (
     pool.find((c) => c.id === d.residence) ||
     countries.find((c) => c.id === d.residence) ||
     countries.find((c) => c.id === s.country)
   );
+  return s.flowVersion===2 && d.world==='today' ? referenceCountry(c,s.sex) : c;
 }
 export function netWorth(s) {
   const a = initSystems(s).assets;
@@ -468,7 +470,7 @@ export function yearSystems(s, countries) {
     d.friends.push({ name: "从小一起长大的朋友", since: 10, closeness: 78 });
   if (s.age === 24)
     d.friends.push({ name: "工作中认识的朋友", since: 24, closeness: 65 });
-  if (!s.pending && sceneCatalog[s.age]) {
+  if (s.flowVersion !== 2 && !s.pending && sceneCatalog[s.age]) {
     d.pendingScene = s.age;
     s.pending = "scene";
   }

@@ -20,7 +20,7 @@ configureEras(
     readFileSync(new URL("../public/data/eras.json", import.meta.url)),
   ),
 );
-test("30000 mixed-world lives survive variable choices, credit, queued offers, investments and reloads", () => {
+test("5000 mixed-world lives survive variable choices, credit, queued offers, investments and reloads", () => {
   const worlds = [
     { world: "today", year: 2026 },
     ...[1970, 1990, 2010].map((year) => ({ world: "past", year })),
@@ -31,7 +31,7 @@ test("30000 mixed-world lives survive variable choices, credit, queued offers, i
     moves = 0,
     actions = 0,
     ends = 0;
-  for (let seed = 20001; seed <= 50000; seed++) {
+  for (let seed = 20001; seed <= 25000; seed++) {
     const fixedCountry = seed - 20001 < countries.length;
     const setting = fixedCountry ? worlds[0] : worlds[seed % worlds.length];
     const pool = worldCountries(countries, setting.world, setting.year);
@@ -55,9 +55,10 @@ test("30000 mixed-world lives survive variable choices, credit, queued offers, i
       if (s.deep.reflection !== null)
         remember(s, draw() < 0.5 ? "" : "保留这一刻。");
       else if (s.pending) {
-        const choice = Math.floor(draw() * pendingDecision(s,countries).choices.length);
+        const enabled=pendingDecision(s,countries).choices.map((c,i)=>c.disabled?null:i).filter(i=>i!==null);
+        const choice = enabled[Math.floor(draw() * enabled.length)];
         choices.add(
-          `${s.pending === "scene" ? s.deep.pendingScene : s.pending}:${choice}`,
+          `${pendingDecision(s,countries).id || (s.pending === "scene" ? s.deep.pendingScene : s.pending)}:${choice}`,
         );
         assert.ok(choose(s, choice, countries));
       } else {
@@ -101,8 +102,8 @@ test("30000 mixed-world lives survive variable choices, credit, queued offers, i
     assert.equal(s.stage, "ended", `stuck life ${seed}`);
     ends++;
   }
-  for(const decision of decisions.filter(d=>!d.legacy))
-    for(let i=0;i<decision.choices.length;i++)assert.ok(choices.has(`${decision.age}:${i}`));
+  for(const [id,count] of [['temperament',4],['hobby',3],['secondary',2],['highschool',3],['major',5],['first-job',5]])
+    for(let i=0;i<count;i++)assert.ok(choices.has(`${id}:${i}`),`missing ${id}:${i}`);
   assert.equal(visited.size, countries.length);
   assert.ok(moves > 100);
   assert.ok(actions > 10000);

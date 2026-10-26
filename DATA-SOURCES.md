@@ -1,8 +1,18 @@
 # 数据与署名
 
-本项目为独立实现，玩法灵感来自 [1 in 8 Billion](https://1in8b.life/en/)。不包含原站的代码、文案、美术、音乐、玩家记录或接口集成。原站的内容不适用本项目 MIT 许可。
+本项目为独立实现，玩法灵感来自 [1 in 8 Billion](https://1in8b.life/en/)。界面和交互参照公开页面，国家统计使用公开页面上的事实数据；程序与场景美术在本仓库实现，不分发原站程序、美术、音乐或玩家记录。原站的内容不适用本项目 MIT 许可。
 
-## 人口与经济数据
+## v5 公开国家统计
+
+`public/data/reference-statistics.json` 和 `reference-coverage.json`：2026-10-26 从 [原站公开国家表](https://1in8b.life/zh/c/) 及其 172 个详情页摘录数值事实、城市列表和宗教比例；未使用原站应用程序或私有接口。数据文件保留观测日期与来源说明。这是页面四舍五入后的数值，不是原站内部模拟表，不保证与其内部精度一致。
+
+来源页列举联合国 [World Population Prospects 2024](https://population.un.org/wpp/)、[UN IGME](https://childmortality.org/)、[WHO](https://www.who.int/data/gho)、[UNESCO UIS](https://uis.unesco.org/)、[UNDP](https://hdr.undp.org/)、[World Bank WDI](https://data.worldbank.org/)、[ILO](https://ilostat.ilo.org/)、UN-Habitat、UNAIDS、UNODC、UNICEF 和世界幸福报告；指标采用各自最新可用年份，部分地区是估计值。MIT 许可仅覆盖本项目自有代码，外部统计适用其来源条款。详情链接保留在游戏国家资料卡中。
+
+今日出生权重使用页面显示的出生占比，在覆盖地区归一化；人口抽样使用显示人口。性别预期寿命、婴儿及五岁前死亡率用于独立寿命模型，其余成年死亡锚点仍取下列 WDI 数据。城市、宗教抽样和家庭等游戏规则另行实现，不能推断与原站随机分布相同。
+
+v5 金额以中国大陆物价换算为人民币，使用世界银行 2023 年 [PPP conversion factor (GDP), China](https://data.worldbank.org/indicator/PA.NUS.PPP?locations=CN) 3.64373827497296 元/国际元。它是购买力换算系数，不是外汇汇率。旧档案仍展示原有国际元；消费、工资和资产估值都是游戏参数。
+
+## 原有 WDI 基础与历史数据
 
 `public/data/countries.json`：World Bank, World Development Indicators，2023 年冻结截面，提取于 2026-10-25。217 个国家和地区具有完整的人口、粗出生率、出生时预期寿命数据。排除世界、地区和收入组等汇总值。
 
@@ -25,7 +35,9 @@
 
 ## 地图
 
-v4 的 `public/assets/life-town.svg` 是为本项目独立绘制的像素小镇，人物与活动道具由 `town-scene.js` 生成。画面参考温暖的田园游戏氛围，未使用《星露谷物语》或参考站的图片、角色、地图、音效和代码。小镇是叙事空间，不表示各国真实地理、建筑或生活环境。
+v5 的 `public/pixel-scene.js` 按人物年龄、家庭与城乡绘制生活场景。画面由本项目独立生成，仍与原站场景不同。
+
+v4 的历史文件 `public/assets/life-town.svg` 是为本项目独立绘制的像素小镇，人物与活动道具由 `town-scene.js` 生成。画面参考温暖的田园游戏氛围，未使用《星露谷物语》或参考站的图片、角色、地图、音效和代码。小镇是叙事空间，不表示各国真实地理、建筑或生活环境。
 
 `public/data/land.json`：由 [Natural Earth 1:110m Admin 0 Countries](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_0_countries.geojson) 提取几何轮廓，坐标四舍五入到两位小数，不展示边界。Natural Earth 数据为[公共领域](https://www.naturalearthdata.com/about/terms-of-use/)。
 

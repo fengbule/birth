@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import {createLife} from '../public/engine.js';
 import {configureEras} from '../public/systems.js';
-const countries=JSON.parse(fs.readFileSync(new URL('../public/data/countries.json',import.meta.url))).countries;
+import {withReferenceCountries} from '../public/reference-data.js';
+const countries=withReferenceCountries(JSON.parse(fs.readFileSync(new URL('../public/data/countries.json',import.meta.url))).countries);
 configureEras(JSON.parse(fs.readFileSync(new URL('../public/data/eras.json',import.meta.url))));
 const targets=['CHN','IND','NGA','COD','CAF','USA','JPN','BRA','DEU','IDN','PAK','BGD'];
 const out=[];

@@ -83,7 +83,7 @@ with sync_playwright() as p:
                         page.locator('#pauseBtn' if side=='reference' else '[data-action=pause]').click()
                     elif stage=='menu':
                         if side=='reference' and width<650: page.locator('#moreBtn').click()
-                        elif side=='deployed': page.locator('[data-action=game-menu]').click()
+                        elif side=='deployed' and page.locator('[data-action=game-menu]').is_visible(): page.locator('[data-action=game-menu]').click()
                     capture(page, side, stage, width)
             report['pairs'].append({'title':f'{width}px · {stage}',
                 'reference':f'reference-{stage}-{width}.png','deployed':f'deployed-{stage}-{width}.png'})

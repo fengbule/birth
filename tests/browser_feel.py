@@ -26,7 +26,7 @@ with sync_playwright() as p:
         page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
         page.set_default_timeout(15000)
         start(page,fixtures[0])
-        assert not page.locator('.focus-box').is_visible()
+        assert page.locator('.focus-box').is_visible()
         page.locator('[data-speed="16"]').click()
         expect(page.locator('[data-action=pause]')).to_have_attribute('aria-pressed','false')
         page.locator('[data-action=pause]').click()
@@ -82,7 +82,7 @@ with sync_playwright() as p:
         assert override_ms<800,override_ms
         assert page.locator('[data-action=auto]').get_attribute('aria-pressed')=='true'
         assert page.locator('.focus-choices button').count()==5
-        assert page.locator('.event').filter(has_text='慢慢长成自己的样子').count()==1
+        assert page.locator('.event').filter(has_text='气质渐渐清晰').count()==1
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         page.screenshot(path=str(OUT/f'childhood-{width}.png'))
         assert not errors,errors
