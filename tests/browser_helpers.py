@@ -35,6 +35,9 @@ def next_stop(page):
         if page.locator('#modal[open]').is_visible() or page.locator('#ending-view').is_visible():
             return
         if page.locator('[data-action=moment-next]:visible').count():
+            if page.locator('[data-action=next-choice]').get_attribute('aria-pressed')=='true':
+                page.wait_for_function('''()=>!document.querySelector('[data-action="moment-next"]') || document.querySelector('#modal').open''',timeout=20000)
+                continue
             page.locator('[data-action=moment-next]').click()
             continue
         if page.locator('.moment-card.is-happening').is_visible():

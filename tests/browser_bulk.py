@@ -72,6 +72,9 @@ async def run_life(browser,sem,index,fixture):
                     await page.wait_for_function("()=>!document.querySelector('.moment-card.is-happening')",timeout=15000)
                     continue
                 if await page.locator('[data-action=moment-next]:visible').count():
+                    if await page.locator('[data-action=next-choice]').get_attribute('aria-pressed')=='true':
+                        await page.wait_for_function('''()=>!document.querySelector('[data-action="moment-next"]') || document.querySelector('#modal').open''',timeout=20000)
+                        continue
                     await page.locator('[data-action=moment-next]').click();continue
                 choices=page.locator('[data-choice]:visible')
                 if await choices.count():

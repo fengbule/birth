@@ -852,6 +852,7 @@ document.addEventListener("click", async (e) => {
   if (target.dataset.speed) {
     speed = Number(target.dataset.speed);
     running = true;
+    if(townTask)townTask.paused=false;
     fastForward = false;
     elapsed = 0;
     renderGame();

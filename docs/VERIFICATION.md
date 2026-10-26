@@ -24,6 +24,6 @@
 
 ## 部署准备
 
-前端 4.0.0，静态内容摘要 `c39d2d31f0431f1e8bbb5eacb40bad5dd979eb6632c15a6c7e571a35136bac46`。API 接口版本仍为 2。升级前一致性备份 `/data/workspace/birth-backups/pre-v4-20261026T014017Z.sqlite`，完整性 ok、公开记录数 0，另存旧提交及静态 tar.gz。旧备份均保留。
+前端 4.0.0，静态内容摘要 `f4f4ddb2de82c9a80438e056bc9ce6e9e8389cccb4e4ff8e56c8aea28b183ec3`。API 接口版本仍为 2。升级前一致性备份 `/data/workspace/birth-backups/pre-v4-20261026T014017Z.sqlite`，完整性 ok、公开记录数 0，另存旧提交及静态 tar.gz。旧备份均保留。
 
 公网结果在部署后补记；本节以上为本地已完成的测试。

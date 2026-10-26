@@ -16,7 +16,7 @@ with sync_playwright() as p:
   page.goto(BASE+f'/?seed={fixture["seed"]}',wait_until='networkidle');page.locator('#shared-birth').click()
   page.locator('[data-action=begin-life]').click();page.locator('[data-action=pause]').click()
   expect(page.locator('.town-landscape')).to_be_visible()
-  assert page.locator('.town-landscape').evaluate('(img)=>img.complete&&img.naturalWidth>0')
+  page.wait_for_function("()=>{const img=document.querySelector('.town-landscape');return img?.complete&&img.naturalWidth>0}")
   assert page.locator('[data-town-place]').count()==1
   assert not page.locator('.identity-card').is_visible()
   assert not page.locator('.timeline').is_visible()
@@ -35,7 +35,8 @@ with sync_playwright() as p:
   page.locator('[data-action=pause]').click();page.wait_for_timeout(2100)
   assert page.locator('.moment-card.is-happening').is_visible()
   assert page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).current.deep.annual.actions.length")==0
-  page.locator('[data-action=pause]').click()
+  page.locator('[data-speed="2"]').click()
+  assert page.locator('[data-action=pause]').get_attribute('aria-pressed')=='false'
   expect(page.locator('.moment-card.is-happening')).not_to_be_visible(timeout=6000)
   assert page.locator('.moment-card h2').inner_text()=='和家人待一会儿'
   after=page.evaluate("JSON.parse(localStorage.getItem('birth.v1')).current")
