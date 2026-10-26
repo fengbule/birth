@@ -64,10 +64,15 @@ async def run_life(browser,sem,index,fixture):
             await page.locator('#shared-birth').click()
             await page.locator('[data-action=begin-life]').click()
             await page.locator('[data-action=pause]').click()
-            for turn in range(250):
+            for turn in range(1200):
                 s=await state(page)
                 assert s['country']==fixture['country']
-                if s['stage']=='ended':break
+                if await page.locator('#ending-view').is_visible():break
+                if await page.locator('.moment-card.is-happening').is_visible():
+                    await page.wait_for_function("()=>!document.querySelector('.moment-card.is-happening')",timeout=15000)
+                    continue
+                if await page.locator('[data-action=moment-next]:visible').count():
+                    await page.locator('[data-action=moment-next]').click();continue
                 choices=page.locator('[data-choice]:visible')
                 if await choices.count():
                     count=await choices.count()
@@ -85,6 +90,7 @@ async def run_life(browser,sem,index,fixture):
                 if s['pending']:
                     await page.locator('[data-action=decision]').click();continue
                 if s['age']>=8 and not starred:
+                    await page.locator('.journal-archive summary').click()
                     row=page.locator('.event').first
                     await row.locator('h3').click()
                     star=row.locator('[data-star]');event_id=await star.get_attribute('data-star')
@@ -92,6 +98,7 @@ async def run_life(browser,sem,index,fixture):
                     await page.reload(wait_until='networkidle')
                     await page.locator('#resume-button').click()
                     await page.locator('[data-action=pause]').click()
+                    await page.locator('.journal-archive summary').click()
                     restored=page.locator(f'[data-star="{event_id}"]')
                     assert await restored.get_attribute('aria-pressed')=='true'
                     assert await restored.locator('xpath=ancestor::article').get_attribute('aria-expanded')=='false'
@@ -99,11 +106,18 @@ async def run_life(browser,sem,index,fixture):
                 if s['age']>=25 and not shopped:
                     await shop(page,result);shopped=True
                 if s['age']>=8 and s['age']%12==0:
+                    if await page.locator('.town-focus').get_attribute('open') is None:
+                        await page.locator('.town-focus summary').click()
                     await page.locator('[data-focus=health]').click()
                     assert (await state(page))['deep'].get('autoFocus') is False
                 assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-                await action(page,'next-year')
-            else:raise AssertionError('250 UI turns did not finish the life')
+                forward=page.locator('[data-action=next-choice]')
+                if await forward.get_attribute('aria-pressed')!='true':await forward.click()
+                await page.wait_for_function('''()=>document.querySelector('#modal').open ||
+                    document.querySelector('.moment-card.is-happening') ||
+                    document.querySelector('[data-action="moment-next"]') ||
+                    !document.querySelector('#ending-view').classList.contains('hidden')''',timeout=10000)
+            else:raise AssertionError('1200 UI turns did not finish the life')
             assert await page.locator('#ending-view').is_visible()
             ending_start=time.monotonic()
             await page.screenshot(path=str(OUT/f'{fixture["country"]}-ending-start.png'))

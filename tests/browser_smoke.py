@@ -29,7 +29,8 @@ with sync_playwright() as p:
     page.locator('[data-choice="0"]').click()
     next_stop(page)
     page.locator('[data-choice="0"]').click()
-    page.locator('#focus-select').select_option('health')
+    if page.locator('.town-focus').get_attribute('open') is None:page.locator('.town-focus summary').click()
+    page.locator('[data-focus=health]').click()
     page.reload(wait_until='networkidle')
     assert page.locator('#resume-button').is_visible()
     page.locator('#resume-button').click()
@@ -97,7 +98,7 @@ with sync_playwright() as p:
     page.locator('[data-action=begin-life]').click()
     page.locator('[data-action=auto]').click()
     page.locator('[data-speed="16"]').click()
-    for attempt in range(200):
+    for attempt in range(500):
         if int(page.locator('.age-display strong').inner_text())>=8:break
         page.wait_for_timeout(200)
     assert int(page.locator('.age-display strong').inner_text())>=8
@@ -116,7 +117,7 @@ with sync_playwright() as p:
     page.locator('[data-action=pause]').click()
     next_stop(page)
     page.keyboard.press('Escape')
-    assert page.locator('.pending-banner').is_visible()
+    assert page.locator('[data-action=decision]').is_visible()
     age=page.locator('.age-display strong').inner_text()
     click_action(page, 'next-year')
     assert page.locator('.choice-tag').inner_text().startswith(age+' 岁')

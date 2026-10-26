@@ -837,6 +837,8 @@ export function validateSystems(s, countries) {
         "insurance",
         "volunteer",
         "childbirth",
+        "town-home", "town-rest", "town-play", "town-read", "town-garden",
+        "town-lake", "town-friend", "town-work",
       ].includes(a),
     )
   )

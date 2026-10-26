@@ -31,12 +31,20 @@ def finish_ending(page):
 
 def next_stop(page):
     """Fast-forward through visible years; stop at a decision, reflection or end."""
-    for _ in range(15):
+    for _ in range(250):
         if page.locator('#modal[open]').is_visible() or page.locator('#ending-view').is_visible():
             return
-        page.locator('[data-action=next-choice]').click()
+        if page.locator('[data-action=moment-next]:visible').count():
+            page.locator('[data-action=moment-next]').click()
+            continue
+        if page.locator('.moment-card.is-happening').is_visible():
+            page.wait_for_function("()=>!document.querySelector('.moment-card.is-happening')",timeout=15000)
+            continue
+        button=page.locator('[data-action=next-choice]')
+        if button.get_attribute('aria-pressed')!='true':button.click()
         page.wait_for_function('''()=>document.querySelector('#modal').open ||
             !document.querySelector('#ending-view').classList.contains('hidden') ||
+            document.querySelector('[data-action="moment-next"]') ||
             document.querySelector('[data-action="next-choice"]').getAttribute('aria-pressed')==='false' ''',timeout=45000)
         if page.locator('#modal[open]').is_visible() or page.locator('#ending-view').is_visible():return
     raise AssertionError('Could not reach a stop through visible fast-forward controls')

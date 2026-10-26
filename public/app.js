@@ -23,12 +23,14 @@ import {
 } from "./deep-ui.js";
 import { readOwners, validOwners, mergeOwners } from "./ownership.js";
 import {
-  gameMarkup,
   miniMap,
   registrationMarkup,
 } from "./presentation.js";
 import { deathRecordMarkup, endingMarkup, endingFrames, endingFrameMarkup } from "./life-record.js";
 import { AUTO_READING_MS, yearInterval, autoChoiceIndex, focusOptions } from "./playback.js";
+import { gameMarkup } from './town-ui.js';
+import { TownScene } from './town-scene.js';
+import { placeById, routinePlace, townActivities, performTownActivity } from './town-activities.js';
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -73,13 +75,68 @@ let lastTick = performance.now(),
   musicNodes = [],
   musicOn = false;
 const expandedEvents = new Set();
-const collapsedPanels = new Set();
 let fastForward = false,
   autoPreview = null,
   suppressedDecision = null;
 let endingPlayback = null;
 let chosenDialogClose = false;
 const decisionKey = () => current ? [current.id,current.age,current.pending,current.deep?.experience?.activeEvent?.id||""].join(":") : "";
+let townTask=null, selectedPlace=null, storyQueue=[], storyIndex=0,
+  storyContinuation=null, storyElapsed=0, currentMoment=null;
+const townScene=new TownScene({onPhase:phase=>{
+  if(!townTask)return;
+  townTask.phase=phase;
+  const label=$('#town-current-action');
+  if(label)label.textContent=phase==='walking'?'正在前往'+placeById(townTask.place).name:townTask.label;
+  $('.moment-process')?.classList.toggle('has-arrived',phase==='acting');
+}});
+const statSnapshot=()=>Object.fromEntries(['health','happiness','knowledge','relationships'].map(key=>[key,current[key]]));
+function resetTownFlow(){
+  townScene.cancel();townTask=null;storyQueue=[];storyIndex=0;storyContinuation=null;
+  currentMoment=null;selectedPlace=null;storyElapsed=0;
+}
+function tellStories(records,before,continuation){
+  storyQueue=records.length?records:[{title:'那些平凡的日子',text:`这一年，你在${routinePlace(current).name}和熟悉的街道间来往。生活也在这些小事里，慢慢往前。`}];
+  storyIndex=0;storyElapsed=0;storyContinuation=continuation;
+  currentMoment={...storyQueue[0],before,label:current.age+' 岁 · 正在经历'};
+  renderGame();
+  if(innerWidth<=850&&!fastForward&&!current.auto)$('.moment-card')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function nextStory(){
+  if(!storyQueue.length)return;
+  storyIndex++;storyElapsed=0;
+  if(storyIndex<storyQueue.length){
+    currentMoment={...storyQueue[storyIndex],label:current.age+' 岁 · 正在经历'};
+    renderGame();return;
+  }
+  const continuation=storyContinuation;
+  storyQueue=[];storyIndex=0;storyContinuation=null;currentMoment=null;
+  renderGame();lastTick=performance.now();elapsed=0;
+  continuation?.();
+}
+function beginTownTask({place,label,kind='activity',complete}){
+  if(townTask||storyQueue.length||view!=='game')return;
+  const lifeId=current.id,age=current.age,quick=fastForward||(current.auto&&speed>=8);
+  const task={lifeId,age,place,label,kind,paused:false,phase:'walking'};
+  townTask=task;currentMoment=null;
+  renderGame();
+  townScene.move(place,label,{quick,duration:quick?650:kind==='year'?1000:1800,complete:()=>{
+    if(townTask!==task||view!=='game'||current.id!==lifeId||current.age!==age)return;
+    townTask=null;complete();
+  }});
+  if(innerWidth<=850&&!fastForward&&!current.auto)$('.town-world')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function chooseTownActivity(place,id){
+  const item=townActivities(current,place,countries).find(a=>a.id===id);
+  if(!item||item.disabled||current.pending||storyQueue.length)return;
+  const before=statSnapshot(),last=current.events.at(-1)?.id;
+  beginTownTask({place,label:item.verb,complete:()=>{
+    const result=performTownActivity(current,place,id,countries);
+    save();
+    if(result.ok)tellStories(current.events.filter(e=>e.id>last),before,()=>{});
+    else {renderGame();toast(result.message);}
+  }});
+}
 try {
   const stored = JSON.parse(localStorage.getItem(PREF) || "{}");
   preferences =
@@ -190,6 +247,7 @@ function closeModal(chosen = false) {
   lastTick = performance.now();
 }
 function showHome() {
+  resetTownFlow();
   running = false;
   fastForward = false;
   autoPreview = null;
@@ -209,6 +267,7 @@ function showHome() {
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 function showGame() {
+  resetTownFlow();
   view = "game";
   document.body.dataset.view = view;
   $("#registration-view").classList.add("hidden");
@@ -341,6 +400,7 @@ function birth(seed) {
   showRegistration();
 }
 function showRegistration() {
+  resetTownFlow();
   closeModal();
   running = false;
   view = "registration";
@@ -368,36 +428,39 @@ function showRegistration() {
 function renderGame() {
   if (!current) return;
   const open = $(".game-menu") && !$(".game-menu").hidden;
+  const retainedMap=$('#town-map');
+  const folds=new Map([...document.querySelectorAll('#game-view details[data-fold]')].map(node=>[node.dataset.fold,node.open]));
   $("#game-view").innerHTML = gameMarkup({
     s: current,
     countries,
-    running,
+    running:townTask?!townTask.paused:running,
     speed,
     timelineLimit,
     musicOn,
     expandedEvents,
     fastForward,
+    moment:currentMoment,
+    activity:townTask,
+    selectedPlace,
+    storyIndex,
+    storyCount:storyQueue.length,
   });
   if (innerWidth <= 1250) $(".game-menu").append($(".game-extra-controls"));
-  document.querySelectorAll(".identity-card,.profile-card,.game-insights .insight-card").forEach((panel, index) => {
-    const heading = panel.querySelector(".panel-title,.identity-band");
-    const toggle = document.createElement("button");
-    const collapsed = collapsedPanels.has(index);
-    toggle.className = "panel-collapse";
-    toggle.dataset.action = "panel-collapse";
-    toggle.dataset.panel = index;
-    toggle.textContent = collapsed ? "▸" : "▾";
-    toggle.setAttribute("aria-expanded", String(!collapsed));
-    toggle.setAttribute("aria-label", (collapsed ? "展开" : "收起") + heading.textContent.trim().split(/\s/)[0]);
-    panel.classList.toggle("is-collapsed", collapsed);
-    heading.append(toggle);
-  });
+  if(retainedMap?.dataset.life===current.id){
+    const fresh=$('#town-map'),hotspots=[...fresh.querySelectorAll('[data-town-place]')];
+    retainedMap.querySelectorAll('[data-town-place]').forEach(node=>node.remove());
+    retainedMap.append(...hotspots);fresh.replaceWith(retainedMap);
+  }
+  document.querySelectorAll('#game-view details[data-fold]').forEach(node=>{if(folds.has(node.dataset.fold))node.open=folds.get(node.dataset.fold);});
+  townScene.attach($('#town-map'),current);
+  if(!townTask)$('#town-current-action').textContent=townScene.label||routinePlace(current).verb;
   if (open) {
     $(".game-menu").hidden = false;
     $("[data-action=game-menu]").setAttribute("aria-expanded", "true");
   }
 }
 function showEnding(s) {
+  resetTownFlow();
   running = false;
   endingLife = s;
   if (view !== "ending") endingOrigin = view;
@@ -421,33 +484,36 @@ function revealEnding() {
 }
 function performStep() {
   if (!current || current.stage !== "living") return;
+  if(townTask||storyQueue.length)return;
   if (pauseForReflection()) return;
   if (current.pending) {
     if (current.auto) autoChoose();
     else showDecision();
     return;
   }
-  const lastEvent = current.events.at(-1)?.id;
+  const place=routinePlace(current);
+  beginTownTask({place:place.id,label:current.age<2?'在家人的照顾中长大':place.verb,kind:'year',complete:finishYear});
+}
+function finishYear(){
+  const lastEvent=current.events.at(-1)?.id,before=statSnapshot();
   step(current, countries);
-  if (current.pending || initSystems(current).reflection !== null || current.stage === "ended") fastForward = false;
   save();
-  renderGame();
+  const records=current.events.filter(e=>e.id>lastEvent);
   if (current.stage === "ended") {
     running = false;
     archive(current);
-    showEnding(current);
-  } else if (pauseForReflection()) return;
-  else if (current.pending) {
-    if (current.auto) autoChoose();
-    else showDecision();
-  } else if (fastForward && current.events.some(e=>e.id>lastEvent && /告别|离世|毕业|出生/.test(e.title))) {
-    fastForward = false;
-    running = false;
-    renderGame();
+    tellStories(records,before,()=>showEnding(current));
+    return;
   }
+  tellStories(records,before,()=>{
+    if(pauseForReflection()){fastForward=false;return;}
+    if(current.pending){fastForward=false;current.auto?autoChoose():showDecision();}
+    else if(fastForward&&records.some(e=>/告别|离世|毕业|出生/.test(e.title))){fastForward=false;running=false;renderGame();}
+  });
 }
 function showDecision(automatic = false) {
   if (!current?.pending) return;
+  if(storyQueue.length||townTask)return;
   const d = pendingDecision(current,countries);
   if (!d) return;
   modal(
@@ -469,6 +535,14 @@ function autoChoose() {
   if (!current?.pending) return;
   if (suppressedDecision === decisionKey()) return;
   if (!autoPreview) showDecision(true);
+}
+function resolveChoice(index){
+  const before=statSnapshot(),last=current.events.at(-1)?.id;
+  if(!choose(current,index,countries))return;
+  closeModal(true);save();elapsed=0;lastTick=performance.now();
+  tellStories(current.events.filter(e=>e.id>last),before,()=>{
+    if(current.pending)setTimeout(()=>current.auto?autoChoose():showDecision(),0);
+  });
 }
 function statistics() {
   modal(
@@ -740,6 +814,13 @@ document.addEventListener("click", async (e) => {
   const target = e.target.closest("button,[data-memory],[data-action]");
   if (!target) return;
   if (target.matches("a[data-action]")) e.preventDefault();
+  if(target.dataset.townPlace){
+    selectedPlace=target.dataset.townPlace;
+    renderGame();
+    if(innerWidth<=850)$('.place-panel')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    return;
+  }
+  if(target.dataset.townActivity){chooseTownActivity(target.dataset.place,target.dataset.townActivity);return;}
   if (target.dataset.world) {
     $("#world-select").value =
       target.dataset.world === "past" ? "past-1990" : target.dataset.world;
@@ -777,14 +858,7 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (target.dataset.choice !== undefined) {
-    if (choose(current, Number(target.dataset.choice), countries)) {
-      closeModal(true);
-      save();
-      renderGame();
-      lastTick = performance.now();
-      elapsed = 0;
-      if (current.pending) setTimeout(()=>current.auto?autoChoose():showDecision(),0);
-    }
+    resolveChoice(Number(target.dataset.choice));
     return;
   }
   if (target.dataset.star !== undefined) {
@@ -827,12 +901,13 @@ document.addEventListener("click", async (e) => {
     return;
   }
   switch (target.dataset.action) {
-    case "panel-collapse": {
-      const index = Number(target.dataset.panel);
-      if (collapsedPanels.has(index)) collapsedPanels.delete(index);
-      else collapsedPanels.add(index);
-      renderGame();
-      $(".panel-collapse[data-panel='" + index + "']").focus({ preventScroll: true });
+    case 'moment-next':nextStory();break;
+    case 'place-close':selectedPlace=null;renderGame();break;
+    case 'activity-cancel':
+      townScene.cancel();townTask=null;elapsed=0;renderGame();break;
+    case 'town-profile':{
+      const dossier=$('.character-dossier');
+      if(dossier){dossier.open=true;dossier.scrollIntoView({behavior:'smooth',block:'nearest'});}
       break;
     }
     case "event-expand": {
@@ -957,6 +1032,7 @@ document.addEventListener("click", async (e) => {
       closeModal();
       break;
     case "pause":
+      if(townTask){townTask.paused=!townTask.paused;renderGame();break;}
       running = !running;
       fastForward = false;
       elapsed = 0;
@@ -965,6 +1041,7 @@ document.addEventListener("click", async (e) => {
       if (running && current.pending) showDecision();
       break;
     case "next-year":
+      if(storyQueue.length){nextStory();break;}
       running = false;
       performStep();
       break;
@@ -983,7 +1060,7 @@ document.addEventListener("click", async (e) => {
         suppressedDecision = null;
       }
       save();
-      if (current.auto && current.pending) autoChoose();
+      if (current.auto && current.pending && !storyQueue.length && !townTask) autoChoose();
       renderGame();
       break;
     case "decision":
@@ -1096,6 +1173,17 @@ setInterval(() => {
   const now = performance.now(),
     delta = Math.min(1000, now - lastTick);
   lastTick = now;
+  if(view==='game'&&current&&!document.hidden&&!$('#modal').open){
+    townScene.tick(delta,townTask?townTask.paused:!running);
+    if(townTask)return;
+    if(storyQueue.length){
+      if((running||current.stage==='ended')&&(current.auto||fastForward)){
+        storyElapsed+=delta;
+        if(storyElapsed>=(fastForward?550:3800))nextStory();
+      }
+      return;
+    }
+  }
   if (view === "ending" && endingPlayback && !document.hidden) {
     const playback = endingPlayback, frame = playback.frames[playback.index];
     if (frame.kind !== "final") {
@@ -1117,12 +1205,7 @@ setInterval(() => {
       if (autoPreview.remaining <= 0) {
         const pick = autoPreview.pick;
         autoPreview = null;
-        choose(current,pick,countries);
-        closeModal(true);
-        save();
-        renderGame();
-        elapsed = 0;
-        if (current.pending) setTimeout(()=>autoChoose(),0);
+        resolveChoice(pick);
       }
       return;
     }

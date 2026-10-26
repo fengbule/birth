@@ -46,7 +46,7 @@ with sync_playwright() as p:
     page.screenshot(path=str(OUT/'family-panel.png'))
     page.locator('[data-life-action=parents]').click()
     page.locator('[data-action=close]').click()
-    page.locator('[data-deep=finance]').click()
+    click_tool(page,'finance')
     page.locator('.portfolio-more summary').click()
     page.locator('#trade-amount').fill('10')
     page.locator('#trade-type').select_option('stocks')

@@ -25,6 +25,8 @@
 
 ## 地图
 
+v4 的 `public/assets/life-town.svg` 是为本项目独立绘制的像素小镇，人物与活动道具由 `town-scene.js` 生成。画面参考温暖的田园游戏氛围，未使用《星露谷物语》或参考站的图片、角色、地图、音效和代码。小镇是叙事空间，不表示各国真实地理、建筑或生活环境。
+
 `public/data/land.json`：由 [Natural Earth 1:110m Admin 0 Countries](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_0_countries.geojson) 提取几何轮廓，坐标四舍五入到两位小数，不展示边界。Natural Earth 数据为[公共领域](https://www.naturalearthdata.com/about/terms-of-use/)。
 
 ## 模拟假设
