@@ -51,7 +51,7 @@ docker compose -p birth ps
 curl -f http://127.0.0.1:8086/api/health
 ```
 
-换端口可设 `BIRTH_PORT=8087`。升级前备份数据库和旧提交；不要执行 `docker compose down -v`，它会删除公共纪念馆数据。操作与恢复见 [运维说明](docs/OPERATIONS.md)。刷新页面后运行新规则；同域名的浏览器旧存档会保留。
+换端口可设 `BIRTH_PORT=8087`。升级前备份数据库和旧提交；不要执行 `docker compose down -v`，它会删除公共纪念馆数据。操作与恢复见 [运维说明](docs/OPERATIONS.md)。刷新后新开一局使用 v5 事件流程；同域名旧存档保留进度和原有规则。
 
 ## 数据与验证
 

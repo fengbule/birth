@@ -13,4 +13,14 @@
 
 升级前一致性备份 `/data/workspace/birth-backups/pre-v5-20261026T025737Z.sqlite`，完整性 ok、公开记录数 0；同期保存旧静态目录、配置与提交。生产数据卷保留。
 
-公网检查完成后补记最终静态摘要及线上结果。证据位于本地 `output/birth-one-to-one/`，私人档案、凭证和数据库不进入仓库。
+## 公网部署与数据
+
+运行版本 5.0.0，静态 SHA-256 `db33f3e1edd955e1b5994935b91cd2d181f94e39f5cb8a5f9f1e2ec5640cf502`，接口版本仍为 2。本地与公网 `version.json` 一致，并逐字节核对主页面、控制器、时间线、叙述、布局、场景、统计与金额等 11 个关键文件。
+
+公网六尺寸布局、主题、收藏与重载全部通过，0 页面运行错误、0 横向溢出。公网与原站另在 1440、390 两个视口完成年内记录、两岁四选、收起冻结 2300ms、重开并选择后继续的操作对照，均通过，0 页面运行错误；不因此宣称全部规则等价。
+
+临时纪念完成发布 → 单独重启 API → 记录保留 → 撤回 → 404。之后一致性快照 `/data/workspace/birth-backups/birth-20261026T030846Z.sqlite` 完整性 ok、公开记录数 0。临时记录已撤回，持久卷 `birth_birth-data` 保留。
+
+前端 UID 101、API 用户 node，二者根文件系统只读；birth、TG archive、relay、Nginx 与 AkileSign 均健康。旧档继续保留原有规则，新开一局使用 v5 事件流程。
+
+证据位于本地 `output/birth-one-to-one/`：`public-presentation/results.json`、`public-contract-comparison/results.json`、`persistence.json` 与 `final-verification.json`。私人档案、凭证和数据库不进入仓库。
