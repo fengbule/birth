@@ -19,7 +19,7 @@ with sync_playwright() as p:
   page=ctx.new_page();page.on('pageerror',lambda e:errors.append(str(e)))
   page.goto(BASE,wait_until='networkidle')
   assert page.locator('#reflection-mode').is_checked()
-  assert page.locator('.country-row').count()==10
+  expect(page.locator('.country-row')).to_have_count(10)
   page.locator('[data-world=future]').click();expect(page.locator('#data-description')).to_contain_text('2050')
   page.locator('[data-world=today]').click();page.locator('#reflection-mode').uncheck()
   page.locator('[data-duration="90"]').click();page.locator('#origin-select').select_option('CHN')
