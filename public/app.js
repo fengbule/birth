@@ -32,6 +32,7 @@ import { deathRecordMarkup, endingMarkup, endingFrames, endingFrameMarkup } from
 import { AUTO_READING_MS, yearInterval, autoChoiceIndex, focusOptions } from "./playback.js";
 import { clockFor, advanceClock, decisionReady } from './timeline-clock.js';
 import { referenceCountry, withReferenceCountries } from './reference-data.js';
+import { patchGame, reconcileTimeline, revealDecision, clearDecisionEntrance, decisionCanChoose } from './game-motion.js';
 const $ = (s) => document.querySelector(s),
   KEY = "birth.v1",
   PREF = "birth.preferences";
@@ -188,6 +189,7 @@ function modal(kicker, html) {
 function closeModal(chosen = false) {
   if (!chosen && current?.pending && $("#modal-content .choices")) suppressedDecision = decisionKey();
   autoPreview = null;
+  clearDecisionEntrance($('#modal'));
   chosenDialogClose = chosen && $("#modal").open;
   $("#modal").close();
   lastTick = performance.now();
@@ -374,21 +376,12 @@ function renderTimeline() {
   const template=document.createElement('template');
   template.innerHTML=gameMarkup({s:current,countries,running,speed,timelineLimit,musicOn,expandedEvents,fastForward});
   const next=template.content.querySelector('.timeline');
-  const old=new Map([...timeline.children].map(e=>[e.dataset.eventid,e]));
-  let previous=null;
-  for(const row of [...next.children]){
-    const item=old.get(row.dataset.eventid)||row;
-    if(!old.has(row.dataset.eventid))item.classList.add('event-arriving');
-    const position=previous?previous.nextElementSibling:timeline.firstElementChild;
-    if(item!==position)timeline.insertBefore(item,position);
-    old.delete(row.dataset.eventid);previous=item;
-  }
-  for(const row of old.values())row.remove();
+  reconcileTimeline(timeline, next);
 }
 function renderGame() {
   if (!current) return;
   const open = $(".game-menu") && !$(".game-menu").hidden;
-  $("#game-view").innerHTML = gameMarkup({
+  patchGame($("#game-view"), gameMarkup({
     s: current,
     countries,
     running,
@@ -397,9 +390,11 @@ function renderGame() {
     musicOn,
     expandedEvents,
     fastForward,
-  });
+  }), current.id);
+  $('.game-heading > p')?.style.setProperty('--year-progress', `${clockFor(current).fraction*100}%`);
   if (innerWidth <= 1250) $(".game-menu").append($(".game-extra-controls"));
   if (innerWidth <= 650) document.querySelectorAll('.profile-card,.game-insights .insight-card').forEach((panel,index)=>{
+    panel.querySelector('.panel-collapse')?.remove();
     const heading=panel.querySelector('.panel-title');
     const toggle=document.createElement('button');
     toggle.className='panel-collapse';toggle.dataset.action='panel-collapse';toggle.dataset.panel=index;
@@ -456,11 +451,13 @@ function showDecision(automatic = false) {
   if (!current?.pending || !decisionReady(current)) return;
   const d = pendingDecision(current,countries);
   if (!d) return;
+  const reopening = !$('#modal').open || !$('#modal').classList.contains('choice-dialog');
   modal(
     "重大抉择",
     `<p class="choice-tag">${current.age} 岁 · ${current.year + current.age} 年</p><h2 class="modal-title">${esc(d.title)}</h2><p class="modal-description">${esc(d.text)}</p>${d.age===2?'<aside class="choice-context-note">人格差异与遗传和环境都有关。2015 年一项综合研究的平均遗传率估计约为 40%。<a href="https://pubmed.ncbi.nlm.nih.gov/25961374/" target="_blank" rel="noopener">Vukasović 与 Bratko</a></aside>':''}<div class="choices">${d.choices.map((c, i) => `<button class="choice-button" data-choice="${i}" ${c.disabled?"disabled":""}><span class="choice-number">${i+1}</span><span><b>${esc(c.title)}</b><small>${esc(c.hint)}</small></span></button>`).join("")}</div><div class="choice-auto"><button class="small-button" data-action="choice-auto">接下来的抉择交给自动</button></div><p class="decision-footnote">没有标准答案。收起窗口后，时间会停在这里等你。</p>`,
   );
   $('#modal').dataset.choiceAge=String(current.age);
+  revealDecision($('#modal'), decisionKey(), reopening);
   if (automatic) {
     suppressedDecision = null;
     const pick = autoChoiceIndex(current,d,()=>random(current));
@@ -783,6 +780,7 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (target.dataset.choice !== undefined) {
+    if (!decisionCanChoose($('#modal'))) return;
     if (choose(current, Number(target.dataset.choice), countries)) {
       closeModal(true);
       save();
@@ -1076,6 +1074,8 @@ $("#modal").addEventListener("click", (e) => {
   }
 });
 $("#modal").addEventListener("close", () => {
+  if ($('#modal').open) { chosenDialogClose = false; return; }
+  clearDecisionEntrance($('#modal'));
   if (!chosenDialogClose && current?.pending) suppressedDecision = decisionKey();
   chosenDialogClose = false;
   autoPreview = null;

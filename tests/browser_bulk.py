@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 BASE=os.environ.get('BIRTH_TEST_URL','http://127.0.0.1:4173')
 OUT=Path(os.environ.get('BIRTH_TEST_OUTPUT','test-results/bulk')).resolve()
 OUT.mkdir(parents=True,exist_ok=True)
-fixtures=json.loads(subprocess.check_output(['node','tests/browser-fixtures.mjs'],text=True,encoding='utf-8'))[:12]
+fixtures=json.loads(subprocess.check_output(['node','tests/browser-fixtures.mjs'],text=True,encoding='utf-8'))[:max(1,min(12,int(os.environ.get('BIRTH_TEST_LIVES','12'))))]
 results=[]
 
 async def state(page):

@@ -4,6 +4,8 @@
 
 **[在线体验](https://8086-agqv47q5at4mzg6nr336pvg33u.instabox.tech)** · [深入玩法](docs/GAMEPLAY.md) · [数据与署名](DATA-SOURCES.md) · [验收记录](docs/VERIFICATION.md) · [原站差异审计](docs/PARITY-AUDIT.md)
 
+v5.1 补齐抉择卡浮入与选项渐显，保留时间线节点，避免年份更新时整页闪换。正常动画与减少动态分别测试，详见 [过渡实测](docs/MOTION-COMPARISON.md)。
+
 v5.0 恢复原站公开页面的连续时间线：同一岁内的事件分次出现，最新记录排在上面，抉择暂时中断时间，选择后继续。桌面为身份、经历、家庭三栏，手机依次显示场景、简要状态、记录、重心及个人资料。撤下 v4 小镇活动与逐段「继续」流程。
 
 本轮实测参考站 v0.8.40。当前已修正可见的时间流程和主要布局，但事件库、随机概率、生命表与美术仍有差异，**尚未通过 1:1 等价验收**。测试通过只表示本项目的受测行为正确，详细观察与差异见 [本轮对照](docs/TIMELINE-COMPARISON.md)。
@@ -74,6 +76,7 @@ python tests/browser_presentation.py
 python tests/browser_compare.py
 python tests/browser_timeline_compare.py
 python tests/browser_feel.py
+python tests/browser_motion.py
 python tests/browser_bulk.py
 ```
 

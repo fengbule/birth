@@ -75,6 +75,7 @@ with sync_playwright() as p:
         assert page.locator('.choice-button small:visible').count()==3
         page.screenshot(path=str(OUT/f'choice-7-{width}.png'))
         page.locator('[data-action=choice-auto]').click()
+        expect(page.locator('.choices')).to_have_attribute('aria-busy','false')
         began=time.monotonic()
         page.locator('[data-choice="1"]').click()
         assert not page.locator('#modal').is_visible()

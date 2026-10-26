@@ -1,6 +1,6 @@
 {
   "name": "birth",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "private": true,
   "type": "module",
   "description": "八十亿分之一 — a self-hosted, statistics-inspired life simulator",
