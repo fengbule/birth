@@ -22,4 +22,4 @@
 
 另外完成六种屏宽布局、收藏与重载回归，两宽度约三秒自动预览与关闭冻结回归、零岁和少年结尾，以及四条完整浏览器人生。四局处理 81 张抉择卡，消费、冷却、冻结、重播和收藏通过。引擎及年内顺序 12 项测试通过。原有大规模规则压力测试见 v5.0 记录，本轮没有把旧测试数量冒充新动画验收。
 
-本地证据位于 `output/birth-motion/`：原站 `reference-choice-motion.json`、`reference-mobile-motion.json` 及录屏；实现 `local/results.json` 为逐帧数据，`feel-final/`、`presentation/`、`bulk/` 为回归结果。公网结果部署后另记。该检查只验证这些过渡与操作，不代表全站已达到 1:1。
+本地证据位于 `output/birth-motion/`：原站 `reference-choice-motion.json`、`reference-mobile-motion.json` 及录屏；实现 `local/results.json` 为逐帧数据，`feel-final/`、`presentation/`、`bulk/` 为回归结果。公网四组相同行为检查也全部通过，手动接管 31–47ms，页面运行错误为空。`public/results.json` 保留逐帧数据，`clips/comparison.html` 是原站与已部署版本的真实录屏并排播放，可切换原速/半速。录屏按实际卡片出现帧对齐。该检查只验证这些过渡与操作，不代表全站已达到 1:1。
